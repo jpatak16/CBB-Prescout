@@ -1,14 +1,12 @@
 library(shiny)
 library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt)
-p_load_current_gh("sportsdataverse/hoopR", dependencies = TRUE, update = TRUE)
+p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR)
+#p_load_current_gh("sportsdataverse/hoopR", dependencies = TRUE, update = TRUE)
 
 our_team = "Oregon"
-opponent = "Texas A&M"
-opponentSRurl = "https://www.sports-reference.com/cbb/schools/texas-am/2022.html"
-
-SRopponentTables = read_html(opponentSRurl) %>% html_table()
-
+opponentList = c("Texas A&M", "VCU", "Wake Forest")
+opponentSRurl_db = read_xlsx("opp_url.xlsx")
+year=2022
 
 #####basic offense table webscrape
 basic_offense_url = "https://www.sports-reference.com/cbb/seasons/2022-school-stats.html"
@@ -67,31 +65,27 @@ team_stats = left_join(basic_offense, basic_defense, by=c("school", "g", "w", "l
 team_stats = left_join(team_stats, advanced_offense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
 team_stats = left_join(team_stats, advanced_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
 
+#convert stats into usable numeric stats
+for(c in 2:67){team_stats[,c] = team_stats[,c] %>% as.numeric()}
+
+#make all stats we want using other stats and standardize school names
+team_stats = team_stats %>% mutate(offense_x2p_percent = (offense_fg - offense_x3p)/(offense_fga - offense_x3pa),
+                                   offense_drb_percent = 100 - defense_orb_percent)
+
 #change team names in df to match with logo table
 team_stats[32,1] = 'BYU'
 team_stats[292,1] = 'SMU'
 team_stats[289,1] = 'USC'
 team_stats[268,1] = "Saint Mary's"
+team_stats[335,1] = "VCU"
 
-#convert stats into usable numeric stats
-for(c in 2:67){team_stats[,c] = team_stats[,c] %>% as.numeric()}
-
-#make all stats we want using other stats
-team_stats = team_stats %>% mutate(offense_x2p_percent = (offense_fg - offense_x3p)/(offense_fga - offense_x3pa),
-                                   offense_drb_percent = 100 - defense_orb_percent)
-
-
-rm(advanced_defense, advanced_offense, basic_defense, basic_offense, advanced_defense_url, advanced_offense_url, basic_defense_url, basic_offense_url, c)
 
 #get graphic info for schools that will be on our plot
-team_info = cfbplotR::logo_ref %>% 
-  filter(school %in% c('Oregon','Texas Southern','SMU', 'BYU', 'Chaminade', "Saint Mary's", 'Houston', 'Montana', 'UC Riverside', 'Arizona State', 'Stanford', 'Portland', 'Baylor', 'Pepperdine', 'Utah', 'Oregon State', 'UCLA', 'USC', 'Washington', 'Colorado', 'California', 'Washington State', 'Arizona', 'Utah State', 'Texas A&M'))
+our_schedule = kp_team_schedule(our_team, year=year) %>% mutate(opponent = clean_school_names(opponent))
+team_info = cfbplotR::logo_ref %>% mutate(school = clean_school_names(school)) %>%
+  filter(school %in% our_schedule$opponent | school %in% opponentList | school == our_team) 
 
 combined = left_join(team_info, team_stats, by=c('school' = 'school'))
-
-#the list of options for our metric comparison plots
-MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
-
 
 #select only the stats we are going to use from our df
 combined = combined %>%
@@ -111,118 +105,153 @@ team_stats_meds = team_stats_meds %>% select(offense_o_rtg, defense_o_rtg, offen
                                              offense_x3p_ar, offense_ast_percent, offense_tov_percent, offense_stl_percent,
                                              offense_blk_percent, offense_orb_percent, offense_drb_percent)
 
-rm(a,c, team_info)
-
-#add aestetics to focus on the teams we want
-combined = combined %>% mutate(color2 = if_else(school == our_team | school == opponent, NA_character_ ,"b/w"),
-                               alpha = if_else(school == our_team | school == opponent, 1, .6))
+#read headshot url table
+headshot_urls_db = read_xlsx("headshot_url.xlsx")
 
 #list of options for filtering and sorting player personnel table
 TableFilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters")
-TableSortList = c()
-
-#find player position
-opp_pos = kp_team_depth_chart(opponent, year = 2022)
-opp_pg = opp_pos %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct) %>% mutate(pos="PG") %>% filter(!is.na(first))
-opp_sg = opp_pos %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct) %>% mutate(pos="SG") %>% filter(!is.na(first))
-opp_sf = opp_pos %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct) %>% mutate(pos="SF") %>% filter(!is.na(first))
-opp_pf = opp_pos %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct) %>% mutate(pos="PF") %>% filter(!is.na(first))
-opp_c = opp_pos %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct) %>% mutate(pos="C") %>% filter(!is.na(first))
-opp_pos = rbind(opp_pg, opp_sg, opp_sf, opp_pf, opp_c) %>% pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% mutate(total=PG+SG+SF+PF+C) %>%
-  mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-8] %>%
-  #combine first and last name then separate so that any extra suffixes are handled the same way as they are when pulling from SR
-  mutate(Player = paste(first, last, sep=" ")) %>% select(Player, PG, SG, SF, PF, C) %>% separate(Player, into = c("first","last"), extra = "drop")
-rm(opp_pg, opp_sg, opp_sf, opp_pf, opp_c)
+TableSortList = c("M/G")
+TableColumnList = c("Player Info", "Positional Info", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense")
 
 
-#base table for personnel output
-PPtable_raw = SRopponentTables[[1]] %>% mutate(team=opponent) %>%
-  select(team, Player, "#", Class, Pos, Height) %>%
-  separate(Player, into = c("first","last"), extra = "drop") %>%
-  right_join(opp_pos, by=c('first', 'last')) %>%
-  #create dummy variables for the TableFilterList to filter by
-  mutate("All Players" = 1)
+rm(advanced_defense, advanced_offense, basic_defense, basic_offense, advanced_defense_url, advanced_offense_url, basic_defense_url, basic_offense_url, c, a, team_info)
 
-
+#the list of options for our metric comparison plots
+MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
 
 
 
 ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
-                tabPanel("Graphical Metric Comparisons",
-                         fluidRow(column(9, h1(strong("Pre-Scout Portal"), align="center", style="color:green"),
-                                         h1("Oregon @ Texas A&M - NIT Round 2", align="center", style="color:green"),
-                                         h3("March 19, 2022", align="center", style="color:green")),
+                tabPanel("Graphical Metric Comparison",
+                         fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
+                                  column(6, h1(strong("Pre-Scout Portal")), uiOutput("header")),
                                   column(3, img(src = "logo_oregon.png", height = 180, width = 240))),
                          sidebarLayout(
                            sidebarPanel(radioButtons("whichGraph", "Metric Comparison", MetricCompList)),
-                           mainPanel(plotOutput("MetricComp", height = "600px")))
-                         ),
-                
+                           mainPanel(plotOutput("MetricComp", height = "600px")))),
                 tabPanel("Player Personnel", 
-                         fluidRow(column(9, h1(strong("Pre-Scout Portal"), align="center", style="color:green"),
-                                         h1("Oregon @ Texas A&M - NIT Round 2", align="center", style="color:green"),
-                                         h3("March 19, 2022", align="center", style="color:green")),
+                         fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
+                                  column(6, h1(strong("Pre-Scout Portal")), uiOutput("header2")),
                                   column(3, img(src = "logo_oregon.png", height = 180, width = 240))),
                          fluidRow(
-                           column(3, selectInput("filterPersonnel", "Filter", TableFilterList), style = "background-color:#f5f5f5"),
-                           column(3, selectInput("sortPersonnel", "Sort", TableFilterList), style = "background-color:#f5f5f5")),
-                         fluidRow(12, gt_output("PlayerPersonnel"))
-                         ),
-                tabPanel("Opponent Trends", h5("Coming Soon")),
-                tabPanel("Shot Charts", h5("Coming Soon")),
-                tabPanel("Lineups", h5("Coming Soon"))
-                )
+                           column(4, selectInput("filterPersonnel", "Filter", TableFilterList), sliderInput("minMinsPPT", "Min/G Minimum", value=5, min=0, max=40), style = "background-color:#f5f5f5"),
+                           column(4, selectInput("sortPersonnel", "Sort", TableSortList), sliderInput("minGamesPPT", "GP Minimum", value=0, min=0, max=30), style = "background-color:#f5f5f5"),
+                           column(4, checkboxGroupInput("columnsPersonnel", "Visible Columns", TableColumnList),style = "background-color:#f5f5f5")),
+                         fluidRow(12, gt_output("PlayerPersonnel"))),
+                tabPanel("Opponent Trends", h5("Under Construction")),
+                tabPanel("Shot Charts", h5("Under Construction")),
+                tabPanel("Lineups", h5("Under Construction"))
+                
+                
+)
+
 
 server = function(input, output, session) {
+  #reactive expressions for changing opponent input
+  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% .[[1,2]])
+  SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
+  #add aestetics to focus on the teams we want
+  combined_df = reactive(combined %>% mutate(color2 = if_else(school == our_team | school == input$opponent, NA_character_ ,"b/w"),
+                                             alpha = if_else(school == our_team | school == input$opponent, 1, .6)))
+  
+  #find player position
+  opp_pos = reactive(kp_team_depth_chart(input$opponent, year = year))
+  opp_pg = reactive(opp_pos() %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct) %>% mutate(pos="PG") %>% filter(!is.na(first)))
+  opp_sg = reactive(opp_pos() %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct) %>% mutate(pos="SG") %>% filter(!is.na(first)))
+  opp_sf = reactive(opp_pos() %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct) %>% mutate(pos="SF") %>% filter(!is.na(first)))
+  opp_pf = reactive(opp_pos() %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct) %>% mutate(pos="PF") %>% filter(!is.na(first)))
+  opp_c = reactive(opp_pos() %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct) %>% mutate(pos="C") %>% filter(!is.na(first)))
+  opp_pos2 = reactive(rbind(opp_pg(), opp_sg(), opp_sf(), opp_pf(), opp_c()) %>% pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% mutate(total=PG+SG+SF+PF+C) %>%
+                        mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-8] %>%
+                        #combine first and last name then separate so that any extra suffixes are handled the same way as they are when pulling from SR
+                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, PG, SG, SF, PF, C) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last))) 
+  
+  #get starters from opponent's last game
+  lastGdate = reactive(kp_team_schedule(input$opponent, year=year) %>% arrange(desc(date)) %>% .[[1,18]])
+  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == input$opponent | away_team_location == input$opponent) %>% .[[1,6]])
+  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent) %>% select(athlete_display_name, starter) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last)))
+  
+  #base table for personnel output
+  PPtable_raw = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent) %>%
+                           select(team, Player, "#", Class, Pos, Height) %>%
+                           separate(Player, into = c("first","last"), extra = "drop") %>%
+                           mutate(last = str_to_title(last)) %>% 
+                           right_join(opp_pos2(), by=c('last')) %>% select(-first.x) %>%
+                           #create dummy variables for the TableFilterList to filter by
+                           mutate("All Players" = 1,
+                                  "Guards" = ifelse(PG+SG>.6, 1, 0),
+                                  "Bigs" = ifelse(C+PF>.75 & C>0 , 1, 0),
+                                  "Wings" = ifelse(Guards+Bigs==0, 1, 0)) %>%
+                           left_join(lastGstarters(), by=c('last')) %>% select(-first) %>%
+                           mutate("Starters" = ifelse(starter==TRUE, 1, 0)) %>% select(-starter) %>%
+                           left_join(SRopponentTables()[[6]] %>% select(Player, "M/G" = MP) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last)), by=c('last')) %>% select(-first.y) %>% relocate(first, .before = last))
+  
+  headshot_urls = reactive(headshot_urls_db %>%
+                             separate(Player, into = c("first","last"), extra = "drop") %>%
+                             mutate(last = str_to_title(last)))
+  #join headshots to PPtable
+  PPtable_raw2 = reactive(left_join(PPtable_raw(), headshot_urls(), by=c("first", "last", "team"="Team")))
+  
   #Set x var and y var for axis labels
   xvar = reactive(str_split(input$whichGraph, " x ")[[1]][1])
   yvar = reactive(str_split(input$whichGraph, " x ")[[1]][2])
+  
   #set x var and y var for values
-  xvardf = reactive(if(input$whichGraph == "ORTG x DRTG"){combined$offense_o_rtg} 
-                    else if(input$whichGraph == "2P% x 3P%"){combined$offense_x2p_percent}
-                    else if(input$whichGraph == "3PAR x 3P%"){combined$offense_x3p_ar}
-                    else if(input$whichGraph == "AST% x TOV%"){combined$offense_ast_percent}
-                    else if(input$whichGraph == "STL% x BLK%"){combined$offense_stl_percent}
-                    else if(input$whichGraph == "OREB% x DREB%"){combined$offense_orb_percent})
-  yvardf = reactive(if(input$whichGraph == "ORTG x DRTG"){combined$defense_o_rtg}
-                    else if(input$whichGraph == "2P% x 3P%"){combined$offense_x3p_percent}
-                    else if(input$whichGraph == "3PAR x 3P%"){combined$offense_x3p_percent}
-                    else if(input$whichGraph == "AST% x TOV%"){combined$offense_tov_percent}
-                    else if(input$whichGraph == "STL% x BLK%"){combined$offense_blk_percent}
-                    else if(input$whichGraph == "OREB% x DREB%"){combined$offense_drb_percent})
+  xvardf = reactive(if(input$whichGraph == "ORTG x DRTG"){combined_df()[,'offense_o_rtg']} 
+                    else if(input$whichGraph == "2P% x 3P%"){combined_df()[,'offense_x2p_percent']}
+                    else if(input$whichGraph == "3PAR x 3P%"){combined_df()[,'offense_x3p_ar']}
+                    else if(input$whichGraph == "AST% x TOV%"){combined_df()[,'offense_ast_percent']}
+                    else if(input$whichGraph == "STL% x BLK%"){combined_df()[,'offense_stl_percent']}
+                    else if(input$whichGraph == "OREB% x DREB%"){combined_df()[,'offense_orb_percent']})
+  yvardf = reactive(if(input$whichGraph == "ORTG x DRTG"){combined_df()[,'defense_o_rtg']}
+                    else if(input$whichGraph == "2P% x 3P%"){combined_df()[,'offense_x3p_percent']}
+                    else if(input$whichGraph == "3PAR x 3P%"){combined_df()[,'offense_x3p_percent']}
+                    else if(input$whichGraph == "AST% x TOV%"){combined_df()[,'offense_tov_percent']}
+                    else if(input$whichGraph == "STL% x BLK%"){combined_df()[,'offense_blk_percent']}
+                    else if(input$whichGraph == "OREB% x DREB%"){combined_df()[,'offense_drb_percent']})
   #set x var and y var for means
   xvar_med = reactive(if(input$whichGraph == "ORTG x DRTG"){team_stats_meds$offense_o_rtg} 
-                    else if(input$whichGraph == "2P% x 3P%"){team_stats_meds$offense_x2p_percent}
-                    else if(input$whichGraph == "3PAR x 3P%"){team_stats_meds$offense_x3p_ar}
-                    else if(input$whichGraph == "AST% x TOV%"){team_stats_meds$offense_ast_percent}
-                    else if(input$whichGraph == "STL% x BLK%"){team_stats_meds$offense_stl_percent}
-                    else if(input$whichGraph == "OREB% x DREB%"){team_stats_meds$offense_orb_percent})
+                      else if(input$whichGraph == "2P% x 3P%"){team_stats_meds$offense_x2p_percent}
+                      else if(input$whichGraph == "3PAR x 3P%"){team_stats_meds$offense_x3p_ar}
+                      else if(input$whichGraph == "AST% x TOV%"){team_stats_meds$offense_ast_percent}
+                      else if(input$whichGraph == "STL% x BLK%"){team_stats_meds$offense_stl_percent}
+                      else if(input$whichGraph == "OREB% x DREB%"){team_stats_meds$offense_orb_percent})
   yvar_med = reactive(if(input$whichGraph == "ORTG x DRTG"){team_stats_meds$defense_o_rtg}
-                    else if(input$whichGraph == "2P% x 3P%"){team_stats_meds$offense_x3p_percent}
-                    else if(input$whichGraph == "3PAR x 3P%"){team_stats_meds$offense_x3p_percent}
-                    else if(input$whichGraph == "AST% x TOV%"){team_stats_meds$offense_tov_percent}
-                    else if(input$whichGraph == "STL% x BLK%"){team_stats_meds$offense_blk_percent}
-                    else if(input$whichGraph == "OREB% x DREB%"){team_stats_meds$offense_drb_percent})
+                      else if(input$whichGraph == "2P% x 3P%"){team_stats_meds$offense_x3p_percent}
+                      else if(input$whichGraph == "3PAR x 3P%"){team_stats_meds$offense_x3p_percent}
+                      else if(input$whichGraph == "AST% x TOV%"){team_stats_meds$offense_tov_percent}
+                      else if(input$whichGraph == "STL% x BLK%"){team_stats_meds$offense_blk_percent}
+                      else if(input$whichGraph == "OREB% x DREB%"){team_stats_meds$offense_drb_percent})
+  
   #invert y axis depending on which metric comp is selected
   flip_yvar = reactive(ifelse((yvar()=="DRTG" | yvar()=="TOV%"), "reverse", "identity"))
   
   #filter and sort PPtable_raw before making it a gt object
+  PPtable = reactive(PPtable_raw2() %>% 
+                       filter(.data[[input$filterPersonnel]] == 1) %>%
+                       filter(.data[["M/G"]] > input$minMinsPPT) %>%
+                       select(URL, first, last, team, "#", Class, Pos, Height, "M/G"))
   
+  output$header = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
+  output$header2 = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
   
-  
-    
   output$MetricComp = renderPlot({
-    ggplot() + scale_y_continuous(trans = flip_yvar()) + 
-      geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") + 
+    ggplot() + scale_y_continuous(trans = flip_yvar()) +
+      geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
       geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
-      geom_cfb_logos(aes(x = xvardf(), y = yvardf(), team=combined$school), width = .05) +
+      geom_cfb_logos(data = combined_df(), aes(x = unlist(xvardf()), y = unlist(yvardf()), team=school), width = .05) +
       xlab(xvar()) + ylab(yvar()) +
       theme_bw()
   })
   
   output$PlayerPersonnel = render_gt({
-    PPtable
+    PPtable() %>% gt() %>%
+      gt_merge_stack_team_color(first, last, team) %>%
+      gt_img_rows(columns = URL, img_source = "web", height = 90) %>%
+      cols_hide(team) %>% cols_label(URL = "",
+                                     first = "Name")
   })
+  
 }
 
 shinyApp(ui, server)
