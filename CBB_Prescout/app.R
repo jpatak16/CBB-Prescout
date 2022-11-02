@@ -110,8 +110,10 @@ headshot_urls_db = read_xlsx("headshot_url.xlsx")
 
 #list of options for filtering and sorting player personnel table
 TableFilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters")
-TableSortList = c("M/G")
+TableSortList = c("MpG")
 TableColumnList = c("Player Info", "Positional Info", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense")
+TableColumnListVecs = list(c("#", "Class", "Pos", "Height"), c("MpG"), c(), c(), c(), c())
+alwaysShow = c("URL", "first", "last", "team")
 
 
 rm(advanced_defense, advanced_offense, basic_defense, basic_offense, advanced_defense_url, advanced_offense_url, basic_defense_url, basic_offense_url, c, a, team_info)
@@ -121,13 +123,42 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                 tabPanel("Graphical Metric Comparison",
                          fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
                                   column(6, h1(strong("Pre-Scout Portal")), uiOutput("header")),
                                   column(3, img(src = "logo_oregon.png", height = 180, width = 240))),
                          sidebarLayout(
-                           sidebarPanel(radioButtons("whichGraph", "Metric Comparison", MetricCompList)),
+                           sidebarPanel(radioButtons("whichGraph", "Metric Comparison", MetricCompList),
+                                        checkboxInput("focus", "Focused View?")),
                            mainPanel(plotOutput("MetricComp", height = "600px")))),
                 tabPanel("Player Personnel", 
                          fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
@@ -136,7 +167,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(
                            column(4, selectInput("filterPersonnel", "Filter", TableFilterList), sliderInput("minMinsPPT", "Min/G Minimum", value=5, min=0, max=40), style = "background-color:#f5f5f5"),
                            column(4, selectInput("sortPersonnel", "Sort", TableSortList), sliderInput("minGamesPPT", "GP Minimum", value=0, min=0, max=30), style = "background-color:#f5f5f5"),
-                           column(4, checkboxGroupInput("columnsPersonnel", "Visible Columns", TableColumnList),style = "background-color:#f5f5f5")),
+                           column(4, checkboxGroupInput("columnsPersonnel", "Visible Columns", choices = TableColumnList),style = "background-color:#f5f5f5")),
                          fluidRow(12, gt_output("PlayerPersonnel"))),
                 tabPanel("Opponent Trends", h5("Under Construction")),
                 tabPanel("Shot Charts", h5("Under Construction")),
@@ -184,7 +215,8 @@ server = function(input, output, session) {
                                   "Wings" = ifelse(Guards+Bigs==0, 1, 0)) %>%
                            left_join(lastGstarters(), by=c('last')) %>% select(-first) %>%
                            mutate("Starters" = ifelse(starter==TRUE, 1, 0)) %>% select(-starter) %>%
-                           left_join(SRopponentTables()[[6]] %>% select(Player, "M/G" = MP) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last)), by=c('last')) %>% select(-first.y) %>% relocate(first, .before = last))
+                           left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last)), by=c('last')) %>% 
+                           select(-first.y) %>% relocate(first, .before = last))
   
   headshot_urls = reactive(headshot_urls_db %>%
                              separate(Player, into = c("first","last"), extra = "drop") %>%
@@ -227,21 +259,40 @@ server = function(input, output, session) {
   flip_yvar = reactive(ifelse((yvar()=="DRTG" | yvar()=="TOV%"), "reverse", "identity"))
   
   #filter and sort PPtable_raw before making it a gt object
+  selected_cols = reactive({
+    tibble(TCL = TableColumnList, TCLV = TableColumnListVecs) %>%
+      filter(TCL %in% input$columnsPersonnel) %>%
+      pull(TCLV) %>%
+      unlist()
+  })
+  
   PPtable = reactive(PPtable_raw2() %>% 
                        filter(.data[[input$filterPersonnel]] == 1) %>%
-                       filter(.data[["M/G"]] > input$minMinsPPT) %>%
-                       select(URL, first, last, team, "#", Class, Pos, Height, "M/G"))
+                       filter(.data[["MpG"]] > input$minMinsPPT) %>%
+                       arrange(desc(.data[[input$sortPersonnel]])) %>%
+                       select(alwaysShow, all_of(selected_cols())))
   
   output$header = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
   output$header2 = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
   
   output$MetricComp = renderPlot({
-    ggplot() + scale_y_continuous(trans = flip_yvar()) +
-      geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
-      geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
-      geom_cfb_logos(data = combined_df(), aes(x = unlist(xvardf()), y = unlist(yvardf()), team=school), width = .05) +
-      xlab(xvar()) + ylab(yvar()) +
-      theme_bw()
+    if(input$focus==F){
+      ggplot() + scale_y_continuous(trans = flip_yvar()) +
+        geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
+        geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
+        geom_cfb_logos(data = combined_df(),
+                       aes(x = unlist(xvardf()), y = unlist(yvardf()), team=school), width = .05) +
+        xlab(xvar()) + ylab(yvar()) +
+        theme_bw()}
+    else{
+      ggplot() + scale_y_continuous(trans = flip_yvar()) +
+        geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
+        geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
+        geom_cfb_logos(data = combined_df(),
+                       aes(x = unlist(xvardf()), y = unlist(yvardf()), team=school, alpha=alpha, color=color2), width = .05) +
+        scale_alpha_identity() + scale_color_identity() +
+        xlab(xvar()) + ylab(yvar()) +
+        theme_bw()}
   })
   
   output$PlayerPersonnel = render_gt({
