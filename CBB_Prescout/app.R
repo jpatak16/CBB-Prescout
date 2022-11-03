@@ -111,8 +111,8 @@ headshot_urls_db = read_xlsx("headshot_url.xlsx")
 #list of options for filtering and sorting player personnel table
 TableFilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters")
 TableSortList = c("MpG")
-TableColumnList = c("Player Info", "Positional Info", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense")
-TableColumnListVecs = list(c("#", "Class", "Pos", "Height"), c("MpG"), c(), c(), c(), c())
+TableColumnList = c("Player Info", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense")
+TableColumnListVecs = list(c("#", "Class", "Pos", "Height", "MpG"), c("PG", "SG", "SF", "PF", "CC"), c(), c(), c(), c())
 alwaysShow = c("URL", "first", "last", "team")
 
 
@@ -167,7 +167,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(
                            column(4, selectInput("filterPersonnel", "Filter", TableFilterList), sliderInput("minMinsPPT", "Min/G Minimum", value=5, min=0, max=40), style = "background-color:#f5f5f5"),
                            column(4, selectInput("sortPersonnel", "Sort", TableSortList), sliderInput("minGamesPPT", "GP Minimum", value=0, min=0, max=30), style = "background-color:#f5f5f5"),
-                           column(4, checkboxGroupInput("columnsPersonnel", "Visible Columns", choices = TableColumnList),style = "background-color:#f5f5f5")),
+                           column(4, checkboxGroupInput("columnsPersonnel", "Visible Columns", choices = TableColumnList, selected = "Player Info"),style = "background-color:#f5f5f5")),
                          fluidRow(12, gt_output("PlayerPersonnel"))),
                 tabPanel("Opponent Trends", h5("Under Construction")),
                 tabPanel("Shot Charts", h5("Under Construction")),
@@ -195,7 +195,7 @@ server = function(input, output, session) {
   opp_pos2 = reactive(rbind(opp_pg(), opp_sg(), opp_sf(), opp_pf(), opp_c()) %>% pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% mutate(total=PG+SG+SF+PF+C) %>%
                         mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-8] %>%
                         #combine first and last name then separate so that any extra suffixes are handled the same way as they are when pulling from SR
-                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, PG, SG, SF, PF, C) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last))) 
+                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, PG, SG, SF, PF, CC=C) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last))) 
   
   #get starters from opponent's last game
   lastGdate = reactive(kp_team_schedule(input$opponent, year=year) %>% arrange(desc(date)) %>% .[[1,18]])
@@ -211,12 +211,13 @@ server = function(input, output, session) {
                            #create dummy variables for the TableFilterList to filter by
                            mutate("All Players" = 1,
                                   "Guards" = ifelse(PG+SG>.6, 1, 0),
-                                  "Bigs" = ifelse(C+PF>.75 & C>0 , 1, 0),
+                                  "Bigs" = ifelse(CC+PF>.75 & CC>0 , 1, 0),
                                   "Wings" = ifelse(Guards+Bigs==0, 1, 0)) %>%
                            left_join(lastGstarters(), by=c('last')) %>% select(-first) %>%
                            mutate("Starters" = ifelse(starter==TRUE, 1, 0)) %>% select(-starter) %>%
                            left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last)), by=c('last')) %>% 
-                           select(-first.y) %>% relocate(first, .before = last))
+                           select(-first.y) %>% relocate(first, .before = last) %>%
+                           mutate(PG = ifelse(PG==0, NA, PG*100), SG = ifelse(SG==0, NA, SG*100), SF = ifelse(SF==0, NA, SF*100), PF = ifelse(PF==0, NA, PF*100), CC = ifelse(CC==0, NA, CC*100)))
   
   headshot_urls = reactive(headshot_urls_db %>%
                              separate(Player, into = c("first","last"), extra = "drop") %>%
@@ -300,7 +301,18 @@ server = function(input, output, session) {
       gt_merge_stack_team_color(first, last, team) %>%
       gt_img_rows(columns = URL, img_source = "web", height = 90) %>%
       cols_hide(team) %>% cols_label(URL = "",
-                                     first = "Name")
+                                     first = "Name") %>%
+      fmt_number(columns = matches("PG") | matches("SG") | matches("SF") | matches("PF") | matches("CC"), decimals=0, drop_trailing_zeros = T) %>%
+      tab_style(
+        style = list(
+          cell_fill(color = "lightgrey")),
+        locations = cells_body(
+          columns = starts_with("PG") | matches("SG") | matches("SF") | matches("PF") | matches("CC")
+        )) %>%
+      sub_missing(
+        columns = starts_with("PG") | matches("SG") | matches("SF") | matches("PF") | matches("CC"),
+        missing_text = " "
+      )
   })
   
 }
