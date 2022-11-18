@@ -199,7 +199,8 @@ server = function(input, output, session) {
   
   #get starters from opponent's last game
   lastGdate = reactive(kp_team_schedule(input$opponent, year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
-  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == input$opponent | away_team_location == input$opponent) %>% .[[1,6]])
+  #### Note: There is an ifelse statement to match input$opponent to espn's naming of the opponent. May have to make adjustments when opponent names dont match syntax with different sources
+  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == ifelse(input$opponent=="Connecticut", 'UConn', input$opponent) | away_team_location == ifelse(input$opponent=="Connecticut", 'UConn', input$opponent)) %>% .[[1,6]])
   lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent) %>% select(athlete_display_name, starter) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)))
   
   #base table for personnel output
