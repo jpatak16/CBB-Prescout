@@ -1,15 +1,15 @@
 library(shiny)
 library(pacman)
 p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR)
-#p_load_current_gh("sportsdataverse/hoopR", dependencies = TRUE, update = TRUE)
+#remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
-opponentList = c("Texas A&M", "VCU", "Wake Forest")
+opponentList = c("Houston", "Connecticut")
 opponentSRurl_db = read_xlsx("opp_url.xlsx")
-year=2022
+year=2023
 
 #####basic offense table webscrape
-basic_offense_url = "https://www.sports-reference.com/cbb/seasons/2022-school-stats.html"
+basic_offense_url = "https://www.sports-reference.com/cbb/seasons/2023-school-stats.html"
 
 basic_offense = read_html(basic_offense_url) %>%
   html_table(fill = TRUE) %>%
@@ -22,7 +22,7 @@ basic_offense = read_html(basic_offense_url) %>%
 colnames(basic_offense)= c(colnames(basic_offense[,1:7]), paste("offense_", colnames(basic_offense[,8:24]), sep = ""))
 
 #####basic defense table webscrape
-basic_defense_url = "https://www.sports-reference.com/cbb/seasons/2022-opponent-stats.html"
+basic_defense_url = "https://www.sports-reference.com/cbb/seasons/2023-opponent-stats.html"
 
 basic_defense = read_html(basic_defense_url) %>%
   html_table(fill = TRUE) %>%
@@ -35,7 +35,7 @@ basic_defense = read_html(basic_defense_url) %>%
 colnames(basic_defense)= c(colnames(basic_defense[,1:7]), paste("defense_", colnames(basic_defense[,8:24]), sep = ""))
 
 #####advanced offense table webscrape
-advanced_offense_url = "https://www.sports-reference.com/cbb/seasons/2022-advanced-school-stats.html"
+advanced_offense_url = "https://www.sports-reference.com/cbb/seasons/2023-advanced-school-stats.html"
 
 advanced_offense = read_html(advanced_offense_url) %>%
   html_table(fill = TRUE) %>%
@@ -48,7 +48,7 @@ advanced_offense = read_html(advanced_offense_url) %>%
 colnames(advanced_offense)= c(colnames(advanced_offense[,1:7]), paste("offense_", colnames(advanced_offense[,8:20]), sep = ""))
 
 #####advanced defense table webscrape
-advanced_defense_url = "https://www.sports-reference.com/cbb/seasons/2022-advanced-opponent-stats.html"
+advanced_defense_url = "https://www.sports-reference.com/cbb/seasons/2023-advanced-opponent-stats.html"
 
 advanced_defense = read_html(advanced_defense_url) %>%
   html_table(fill = TRUE) %>%
@@ -73,11 +73,11 @@ team_stats = team_stats %>% mutate(offense_x2p_percent = (offense_fg - offense_x
                                    offense_drb_percent = 100 - defense_orb_percent)
 
 #change team names in df to match with logo table
-team_stats[32,1] = 'BYU'
-team_stats[292,1] = 'SMU'
-team_stats[289,1] = 'USC'
-team_stats[268,1] = "Saint Mary's"
-team_stats[335,1] = "VCU"
+team_stats[30,1] = 'BYU'
+team_stats[285,1] = 'SMU'
+team_stats[281,1] = 'USC'
+team_stats[259,1] = "Saint Mary's"
+team_stats[341,1] = "VCU"
 
 
 #get graphic info for schools that will be on our plot
@@ -111,8 +111,8 @@ headshot_urls_db = read_xlsx("headshot_url.xlsx")
 #list of options for filtering and sorting player personnel table
 TableFilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters")
 TableSortList = c("MpG")
-TableColumnList = c("Player Info", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense")
-TableColumnListVecs = list(c("#", "Class", "Pos", "Height", "MpG"), c("PG", "SG", "SF", "PF", "CC"), c(), c(), c(), c())
+TableColumnList = c("Player Info", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense", "Player Comp")
+TableColumnListVecs = list(c("#", "Class", "Pos", "Height", "MpG"), c("PG", "SG", "SF", "PF", "CC"), c(), c(), c(), c(), c())
 alwaysShow = c("URL", "first", "last", "team")
 
 
@@ -195,33 +195,33 @@ server = function(input, output, session) {
   opp_pos2 = reactive(rbind(opp_pg(), opp_sg(), opp_sf(), opp_pf(), opp_c()) %>% pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% mutate(total=PG+SG+SF+PF+C) %>%
                         mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-8] %>%
                         #combine first and last name then separate so that any extra suffixes are handled the same way as they are when pulling from SR
-                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, PG, SG, SF, PF, CC=C) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last))) 
+                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, PG, SG, SF, PF, CC=C) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last))) 
   
   #get starters from opponent's last game
-  lastGdate = reactive(kp_team_schedule(input$opponent, year=year) %>% arrange(desc(date)) %>% .[[1,18]])
+  lastGdate = reactive(kp_team_schedule(input$opponent, year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
   opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == input$opponent | away_team_location == input$opponent) %>% .[[1,6]])
-  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent) %>% select(athlete_display_name, starter) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last)))
+  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent) %>% select(athlete_display_name, starter) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)))
   
   #base table for personnel output
   PPtable_raw = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent) %>%
                            select(team, Player, "#", Class, Pos, Height) %>%
-                           separate(Player, into = c("first","last"), extra = "drop") %>%
+                           separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>%
                            mutate(last = str_to_title(last)) %>% 
-                           right_join(opp_pos2(), by=c('last')) %>% select(-first.x) %>%
+                           right_join(opp_pos2(), by=c('last', 'first')) %>%
                            #create dummy variables for the TableFilterList to filter by
                            mutate("All Players" = 1,
                                   "Guards" = ifelse(PG+SG>.6, 1, 0),
                                   "Bigs" = ifelse(CC+PF>.75 & CC>0 , 1, 0),
                                   "Wings" = ifelse(Guards+Bigs==0, 1, 0)) %>%
-                           left_join(lastGstarters(), by=c('last')) %>% select(-first) %>%
+                           left_join(lastGstarters(), by=c('last', 'first')) %>%
                            mutate("Starters" = ifelse(starter==TRUE, 1, 0)) %>% select(-starter) %>%
-                           left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% separate(Player, into = c("first","last"), extra = "drop") %>% mutate(last = str_to_title(last)), by=c('last')) %>% 
-                           select(-first.y) %>% relocate(first, .before = last) %>%
+                           left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)), by=c('last', 'first')) %>%
                            mutate(PG = ifelse(PG==0, NA, PG*100), SG = ifelse(SG==0, NA, SG*100), SF = ifelse(SF==0, NA, SF*100), PF = ifelse(PF==0, NA, PF*100), CC = ifelse(CC==0, NA, CC*100)))
   
   headshot_urls = reactive(headshot_urls_db %>%
-                             separate(Player, into = c("first","last"), extra = "drop") %>%
+                             separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>%
                              mutate(last = str_to_title(last)))
+  
   #join headshots to PPtable
   PPtable_raw2 = reactive(left_join(PPtable_raw(), headshot_urls(), by=c("first", "last", "team"="Team")))
   
@@ -302,7 +302,7 @@ server = function(input, output, session) {
       gt_img_rows(columns = URL, img_source = "web", height = 90) %>%
       cols_hide(team) %>% cols_label(URL = "",
                                      first = "Name") %>%
-      fmt_number(columns = matches("PG") | matches("SG") | matches("SF") | matches("PF") | matches("CC"), decimals=0, drop_trailing_zeros = T) %>%
+      fmt_number(columns = starts_with("PG") | matches("SG") | matches("SF") | matches("PF") | matches("CC"), decimals=0, drop_trailing_zeros = T) %>%
       tab_style(
         style = list(
           cell_fill(color = "lightgrey")),
