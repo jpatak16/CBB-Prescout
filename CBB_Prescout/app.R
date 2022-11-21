@@ -4,7 +4,7 @@ p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
-opponentList = c("Houston", "Connecticut")
+opponentList = c("Connecticut", "Alabama", "Michigan State")
 opponentSRurl_db = read_xlsx("opp_url.xlsx")
 year=2023
 
