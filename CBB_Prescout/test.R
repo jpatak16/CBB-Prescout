@@ -4,7 +4,7 @@ p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
-opponentList = c("Connecticut", "Alabama", "Michigan State")
+opponentList = c("Washington State", "UCLA")
 opponentSRurl_db = read_xlsx("CBB_Prescout/opp_url.xlsx")
 year=2023
 
@@ -121,7 +121,7 @@ rm(advanced_defense, advanced_offense, basic_defense, basic_offense, advanced_de
 #the list of options for our metric comparison plots
 MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
 
-opp = "Michigan State"
+opp = "UCLA"
 
 #reactive expressions for changing opponent input
 opponentSRurl = opponentSRurl_db %>% filter(opponent == opp) %>% .[[1,2]]
