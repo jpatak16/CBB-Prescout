@@ -186,37 +186,44 @@ server = function(input, output, session) {
                                              alpha = if_else(school == our_team | school == input$opponent, 1, .6)))
   
   #find player position
-  opp_pos = reactive(kp_team_depth_chart(input$opponent, year = year))
-  opp_pg = reactive(opp_pos() %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct) %>% mutate(pos="PG") %>% filter(!is.na(first)))
-  opp_sg = reactive(opp_pos() %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct) %>% mutate(pos="SG") %>% filter(!is.na(first)))
-  opp_sf = reactive(opp_pos() %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct) %>% mutate(pos="SF") %>% filter(!is.na(first)))
-  opp_pf = reactive(opp_pos() %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct) %>% mutate(pos="PF") %>% filter(!is.na(first)))
-  opp_c = reactive(opp_pos() %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct) %>% mutate(pos="C") %>% filter(!is.na(first)))
+  #for kenpom functions, abbreviate "State" to "St."
+  opp_kp = reactive(gsub(" State", " St.", input$opponent))
+  opp_kp2 = reactive(gsub("\\.", "", opp_kp()))
+  opp_pos = reactive(kp_team_depth_chart(opp_kp(), year = year))
+  opp_pg = reactive(opp_pos() %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct, '#' = pg_number) %>% mutate(pos="PG") %>% filter(!is.na(first)))
+  opp_sg = reactive(opp_pos() %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct, '#' = sg_number) %>% mutate(pos="SG") %>% filter(!is.na(first)))
+  opp_sf = reactive(opp_pos() %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct, '#' = sf_number) %>% mutate(pos="SF") %>% filter(!is.na(first)))
+  opp_pf = reactive(opp_pos() %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct, '#' = pf_number) %>% mutate(pos="PF") %>% filter(!is.na(first)))
+  opp_c = reactive(opp_pos() %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct, '#' = c_number) %>% mutate(pos="C") %>% filter(!is.na(first)))
   opp_pos2 = reactive(rbind(opp_pg(), opp_sg(), opp_sf(), opp_pf(), opp_c()) %>% pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% mutate(total=PG+SG+SF+PF+C) %>%
-                        mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-8] %>%
+                        mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-9] %>%
                         #combine first and last name then separate so that any extra suffixes are handled the same way as they are when pulling from SR
-                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, PG, SG, SF, PF, CC=C) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last))) 
+                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, '#', PG, SG, SF, PF, CC=C) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last))) 
   
   #get starters from opponent's last game
-  lastGdate = reactive(kp_team_schedule(input$opponent, year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
-  #### Note: There is an ifelse statement to match input$opponent to espn's naming of the opponent. May have to make adjustments when opponent names dont match syntax with different sources
-  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == ifelse(input$opponent=="Connecticut", 'UConn', input$opponent) | away_team_location == ifelse(input$opponent=="Connecticut", 'UConn', input$opponent)) %>% .[[1,6]])
-  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent) %>% select(athlete_display_name, starter) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)))
+  #different name formatting used for certain opponents
+  uconn = reactive(ifelse(input$opponent=='Connecticut', "UConn", input$opponent))
+  lastGdate = reactive(kp_team_schedule(opp_kp(), year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
+  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == input$opponent | away_team_location == input$opponent | home_team_location == uconn() | away_team_location == uconn()) %>% .[[1,6]])
+  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent | team_short_display_name==uconn() | team_short_display_name==opp_kp() | team_short_display_name==opp_kp2()) %>% 
+                             select(athlete_display_name, athlete_jersey, starter) %>% mutate(athlete_display_name = gsub("\\.", "", athlete_display_name)) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)) %>%
+                             mutate(athlete_jersey = as.numeric(athlete_jersey)) %>% rename('#' = athlete_jersey))
   
   #base table for personnel output
   PPtable_raw = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent) %>%
                            select(team, Player, "#", Class, Pos, Height) %>%
+                           mutate(Player = gsub("\\.", "", Player)) %>%
                            separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>%
                            mutate(last = str_to_title(last)) %>% 
-                           right_join(opp_pos2(), by=c('last', 'first')) %>%
+                           right_join(opp_pos2(), by=c('#')) %>% select(-first.y, -last.y) %>% rename(first = first.x, last = last.x) %>%
                            #create dummy variables for the TableFilterList to filter by
                            mutate("All Players" = 1,
                                   "Guards" = ifelse(PG+SG>.6, 1, 0),
                                   "Bigs" = ifelse(CC+PF>.75 & CC>0 , 1, 0),
                                   "Wings" = ifelse(Guards+Bigs==0, 1, 0)) %>%
-                           left_join(lastGstarters(), by=c('last', 'first')) %>%
+                           left_join(lastGstarters(), by=c('#')) %>% select(-first.y, -last.y) %>% rename(first = first.x, last = last.x) %>%
                            mutate("Starters" = ifelse(starter==TRUE, 1, 0)) %>% select(-starter) %>%
-                           left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)), by=c('last', 'first')) %>%
+                           left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% mutate(Player = gsub("\\.", "", Player)) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)), by=c('last', 'first')) %>%
                            mutate(PG = ifelse(PG==0, NA, PG*100), SG = ifelse(SG==0, NA, SG*100), SF = ifelse(SF==0, NA, SF*100), PF = ifelse(PF==0, NA, PF*100), CC = ifelse(CC==0, NA, CC*100)))
   
   headshot_urls = reactive(headshot_urls_db %>%
