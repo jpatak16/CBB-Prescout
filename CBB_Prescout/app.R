@@ -153,7 +153,7 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 
 ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                 tabPanel("Graphical Metric Comparison",
-                         fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
+                         fluidRow(column(3, selectInput("opponent1", "Opponent", opponentList)),
                                   column(6, h1(strong("Pre-Scout Portal")), uiOutput("header")),
                                   column(3, img(src = "logo_oregon.png", height = 180, width = 240))),
                          sidebarLayout(
@@ -161,7 +161,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                         checkboxInput("focus", "Focused View?")),
                            mainPanel(plotOutput("MetricComp", height = "600px")))),
                 tabPanel("Player Personnel", 
-                         fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
+                         fluidRow(column(3, selectInput("opponent2", "Opponent", opponentList)),
                                   column(6, h1(strong("Pre-Scout Portal")), uiOutput("header2")),
                                   column(3, img(src = "logo_oregon.png", height = 180, width = 240))),
                          fluidRow(
@@ -179,15 +179,15 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
 
 server = function(input, output, session) {
   #reactive expressions for changing opponent input
-  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% .[[1,2]])
+  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent1) %>% .[[1,2]])
   SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
   #add aestetics to focus on the teams we want
-  combined_df = reactive(combined %>% mutate(color2 = if_else(school == our_team | school == input$opponent, NA_character_ ,"b/w"),
-                                             alpha = if_else(school == our_team | school == input$opponent, 1, .6)))
+  combined_df = reactive(combined %>% mutate(color2 = if_else(school == our_team | school == input$opponent1, NA_character_ ,"b/w"),
+                                             alpha = if_else(school == our_team | school == input$opponent1, 1, .6)))
   
   #find player position
   #for kenpom functions, abbreviate "State" to "St."
-  opp_kp = reactive(gsub(" State", " St.", input$opponent))
+  opp_kp = reactive(gsub(" State", " St.", input$opponent2))
   opp_kp2 = reactive(gsub("\\.", "", opp_kp()))
   opp_pos = reactive(kp_team_depth_chart(opp_kp(), year = year))
   opp_pg = reactive(opp_pos() %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct, '#' = pg_number) %>% mutate(pos="PG") %>% filter(!is.na(first)))
@@ -202,15 +202,15 @@ server = function(input, output, session) {
   
   #get starters from opponent's last game
   #different name formatting used for certain opponents
-  uconn = reactive(ifelse(input$opponent=='Connecticut', "UConn", input$opponent))
+  uconn = reactive(ifelse(input$opponent2=='Connecticut', "UConn", input$opponent2))
   lastGdate = reactive(kp_team_schedule(opp_kp(), year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
-  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == input$opponent | away_team_location == input$opponent | home_team_location == uconn() | away_team_location == uconn()) %>% .[[1,6]])
-  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent | team_short_display_name==uconn() | team_short_display_name==opp_kp() | team_short_display_name==opp_kp2()) %>% 
+  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == input$opponent2 | away_team_location == input$opponent2 | home_team_location == uconn() | away_team_location == uconn()) %>% .[[1,6]])
+  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent2 | team_short_display_name==uconn() | team_short_display_name==opp_kp() | team_short_display_name==opp_kp2()) %>% 
                              select(athlete_display_name, athlete_jersey, starter) %>% mutate(athlete_display_name = gsub("\\.", "", athlete_display_name)) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)) %>%
                              mutate(athlete_jersey = as.numeric(athlete_jersey)) %>% rename('#' = athlete_jersey))
   
   #base table for personnel output
-  PPtable_raw = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent) %>%
+  PPtable_raw = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent2) %>%
                            select(team, Player, "#", Class, Pos, Height) %>%
                            mutate(Player = gsub("\\.", "", Player)) %>%
                            separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>%
@@ -281,8 +281,8 @@ server = function(input, output, session) {
                        arrange(desc(.data[[input$sortPersonnel]])) %>%
                        select(alwaysShow, all_of(selected_cols())))
   
-  output$header = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
-  output$header2 = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
+  output$header = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent1, '</h1>', sep = "")))
+  output$header2 = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent2, '</h1>', sep = "")))
   
   output$MetricComp = renderPlot({
     if(input$focus==F){
