@@ -132,7 +132,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
                          sidebarLayout(
-                           sidebarPanel(radioButtons("WhichGraph", "Metric Comparison", MetricCompList),
+                           sidebarPanel(radioButtons("whichGraph", "Metric Comparison", MetricCompList),
                                         checkboxInput("focus", "Focused View?")),
                            mainPanel(plotOutput("MetricComp", height = "600px"))
                            ) #end of sidebarLayout
@@ -171,10 +171,69 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
 
 server = function(input, output, session) {
   
-  #Oregon vs TEAM text for header on top of all pages
+  #Oregon vs TEAM text output for header on top of all pages
   output$header6 = output$header5 = output$header4 = output$header3 = output$header2 = output$header = 
     renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
   
+  #add 'focus' aesthetics to our team and opponent
+  GMC_df = reactive(GMC %>% mutate(color2 = if_else(school == our_team | school == input$opponent, NA_character_ ,"b/w"),
+                                   alpha = if_else(school == our_team | school == input$opponent, 1, .6)))
+   
+  #Set x var and y var for axis labels
+  xvar = reactive(str_split(input$whichGraph, " x ")[[1]][1])
+  yvar = reactive(str_split(input$whichGraph, " x ")[[1]][2])
+  
+  #set x var and y var for values ####maybe change logic to xvar()=="ORTG"
+  xvar_vals = reactive(if(input$whichGraph == "ORTG x DRTG"){GMC_df()[,'offense_o_rtg']} 
+                       else if(input$whichGraph == "2P% x 3P%"){GMC_df()[,'offense_x2p_percent']}
+                       else if(input$whichGraph == "3PAR x 3P%"){GMC_df()[,'offense_x3p_ar']}
+                       else if(input$whichGraph == "AST% x TOV%"){GMC_df()[,'offense_ast_percent']}
+                       else if(input$whichGraph == "STL% x BLK%"){GMC_df()[,'offense_stl_percent']}
+                       else if(input$whichGraph == "OREB% x DREB%"){GMC_df()[,'offense_orb_percent']})
+  yvar_vals = reactive(if(input$whichGraph == "ORTG x DRTG"){GMC_df()[,'defense_o_rtg']}
+                       else if(input$whichGraph == "2P% x 3P%"){GMC_df()[,'offense_x3p_percent']}
+                       else if(input$whichGraph == "3PAR x 3P%"){GMC_df()[,'offense_x3p_percent']}
+                       else if(input$whichGraph == "AST% x TOV%"){GMC_df()[,'offense_tov_percent']}
+                       else if(input$whichGraph == "STL% x BLK%"){GMC_df()[,'offense_blk_percent']}
+                       else if(input$whichGraph == "OREB% x DREB%"){GMC_df()[,'offense_drb_percent']})
+  
+  #find medians for the x and y vars
+  xvar_med = reactive(if(input$whichGraph == "ORTG x DRTG"){GMC_medians$offense_o_rtg} 
+                      else if(input$whichGraph == "2P% x 3P%"){GMC_medians$offense_x2p_percent}
+                      else if(input$whichGraph == "3PAR x 3P%"){GMC_medians$offense_x3p_ar}
+                      else if(input$whichGraph == "AST% x TOV%"){GMC_medians$offense_ast_percent}
+                      else if(input$whichGraph == "STL% x BLK%"){GMC_medians$offense_stl_percent}
+                      else if(input$whichGraph == "OREB% x DREB%"){GMC_medians$offense_orb_percent})
+  yvar_med = reactive(if(input$whichGraph == "ORTG x DRTG"){GMC_medians$defense_o_rtg}
+                      else if(input$whichGraph == "2P% x 3P%"){GMC_medians$offense_x3p_percent}
+                      else if(input$whichGraph == "3PAR x 3P%"){GMC_medians$offense_x3p_percent}
+                      else if(input$whichGraph == "AST% x TOV%"){GMC_medians$offense_tov_percent}
+                      else if(input$whichGraph == "STL% x BLK%"){GMC_medians$offense_blk_percent}
+                      else if(input$whichGraph == "OREB% x DREB%"){GMC_medians$offense_drb_percent})
+  
+  #invert y axis if certain metric comps are selected
+  flip_yvar = reactive(ifelse((yvar()=="DRTG" | yvar()=="TOV%"), "reverse", "identity"))
+  
+  #GMC plot output
+  output$MetricComp = renderPlot({
+    if(input$focus==F){
+      ggplot() + scale_y_continuous(trans = flip_yvar()) +
+        geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
+        geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
+        geom_cfb_logos(data = GMC_df(),
+                       aes(x = unlist(xvar_vals()), y = unlist(yvar_vals()), team=school), width = .05) +
+        xlab(xvar()) + ylab(yvar()) +
+        theme_bw()}
+    else{
+      ggplot() + scale_y_continuous(trans = flip_yvar()) +
+        geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
+        geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
+        geom_cfb_logos(data = GMC_df(),
+                       aes(x = unlist(xvar_vals()), y = unlist(yvar_vals()), team=school, alpha=alpha, color=color2), width = .05) +
+        scale_alpha_identity() + scale_color_identity() +
+        xlab(xvar()) + ylab(yvar()) +
+        theme_bw()}
+  }) #end of MetricComp output
   
   
   } #end of server

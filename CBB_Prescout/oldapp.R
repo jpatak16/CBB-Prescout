@@ -9,9 +9,6 @@ TableColumnListVecs = list(c("#", "Class", "Pos", "Height", "MpG"), c("PG", "SG"
 alwaysShow = c("URL", "first", "last", "team")
 
 
-rm(advanced_defense, advanced_offense, basic_defense, basic_offense, advanced_defense_url, advanced_offense_url, basic_defense_url, basic_offense_url, c, a, team_info)
-
-
 
 
 
@@ -69,9 +66,6 @@ server = function(input, output, session) {
   #reactive expressions for changing opponent input
   opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent1) %>% .[[1,2]])
   SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
-  #add aestetics to focus on the teams we want
-  combined_df = reactive(combined %>% mutate(color2 = if_else(school == our_team | school == input$opponent1, NA_character_ ,"b/w"),
-                                             alpha = if_else(school == our_team | school == input$opponent1, 1, .6)))
   
   #find player position
   #for kenpom functions, abbreviate "State" to "St."
@@ -121,40 +115,6 @@ server = function(input, output, session) {
   #join headshots to PPtable
   PPtable_raw2 = reactive(left_join(PPtable_raw(), headshot_urls(), by=c("first", "last", "team"="Team")))
   
-  #Set x var and y var for axis labels
-  xvar = reactive(str_split(input$whichGraph, " x ")[[1]][1])
-  yvar = reactive(str_split(input$whichGraph, " x ")[[1]][2])
-  
-  #set x var and y var for values
-  xvardf = reactive(if(input$whichGraph == "ORTG x DRTG"){combined_df()[,'offense_o_rtg']} 
-                    else if(input$whichGraph == "2P% x 3P%"){combined_df()[,'offense_x2p_percent']}
-                    else if(input$whichGraph == "3PAR x 3P%"){combined_df()[,'offense_x3p_ar']}
-                    else if(input$whichGraph == "AST% x TOV%"){combined_df()[,'offense_ast_percent']}
-                    else if(input$whichGraph == "STL% x BLK%"){combined_df()[,'offense_stl_percent']}
-                    else if(input$whichGraph == "OREB% x DREB%"){combined_df()[,'offense_orb_percent']})
-  yvardf = reactive(if(input$whichGraph == "ORTG x DRTG"){combined_df()[,'defense_o_rtg']}
-                    else if(input$whichGraph == "2P% x 3P%"){combined_df()[,'offense_x3p_percent']}
-                    else if(input$whichGraph == "3PAR x 3P%"){combined_df()[,'offense_x3p_percent']}
-                    else if(input$whichGraph == "AST% x TOV%"){combined_df()[,'offense_tov_percent']}
-                    else if(input$whichGraph == "STL% x BLK%"){combined_df()[,'offense_blk_percent']}
-                    else if(input$whichGraph == "OREB% x DREB%"){combined_df()[,'offense_drb_percent']})
-  #set x var and y var for means
-  xvar_med = reactive(if(input$whichGraph == "ORTG x DRTG"){team_stats_meds$offense_o_rtg} 
-                      else if(input$whichGraph == "2P% x 3P%"){team_stats_meds$offense_x2p_percent}
-                      else if(input$whichGraph == "3PAR x 3P%"){team_stats_meds$offense_x3p_ar}
-                      else if(input$whichGraph == "AST% x TOV%"){team_stats_meds$offense_ast_percent}
-                      else if(input$whichGraph == "STL% x BLK%"){team_stats_meds$offense_stl_percent}
-                      else if(input$whichGraph == "OREB% x DREB%"){team_stats_meds$offense_orb_percent})
-  yvar_med = reactive(if(input$whichGraph == "ORTG x DRTG"){team_stats_meds$defense_o_rtg}
-                      else if(input$whichGraph == "2P% x 3P%"){team_stats_meds$offense_x3p_percent}
-                      else if(input$whichGraph == "3PAR x 3P%"){team_stats_meds$offense_x3p_percent}
-                      else if(input$whichGraph == "AST% x TOV%"){team_stats_meds$offense_tov_percent}
-                      else if(input$whichGraph == "STL% x BLK%"){team_stats_meds$offense_blk_percent}
-                      else if(input$whichGraph == "OREB% x DREB%"){team_stats_meds$offense_drb_percent})
-  
-  #invert y axis depending on which metric comp is selected
-  flip_yvar = reactive(ifelse((yvar()=="DRTG" | yvar()=="TOV%"), "reverse", "identity"))
-  
   #filter and sort PPtable_raw before making it a gt object
   selected_cols = reactive({
     tibble(TCL = TableColumnList, TCLV = TableColumnListVecs) %>%
@@ -169,28 +129,7 @@ server = function(input, output, session) {
                        arrange(desc(.data[[input$sortPersonnel]])) %>%
                        select(alwaysShow, all_of(selected_cols())))
   
-  output$header = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent1, '</h1>', sep = "")))
-  output$header2 = renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent2, '</h1>', sep = "")))
   
-  output$MetricComp = renderPlot({
-    if(input$focus==F){
-      ggplot() + scale_y_continuous(trans = flip_yvar()) +
-        geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
-        geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
-        geom_cfb_logos(data = combined_df(),
-                       aes(x = unlist(xvardf()), y = unlist(yvardf()), team=school), width = .05) +
-        xlab(xvar()) + ylab(yvar()) +
-        theme_bw()}
-    else{
-      ggplot() + scale_y_continuous(trans = flip_yvar()) +
-        geom_hline(yintercept = median(yvar_med()), color = "red", linetype = "dashed") +
-        geom_vline(xintercept = median(xvar_med()), color = "red", linetype = "dashed") +
-        geom_cfb_logos(data = combined_df(),
-                       aes(x = unlist(xvardf()), y = unlist(yvardf()), team=school, alpha=alpha, color=color2), width = .05) +
-        scale_alpha_identity() + scale_color_identity() +
-        xlab(xvar()) + ylab(yvar()) +
-        theme_bw()}
-  })
   
   output$PlayerPersonnel = render_gt({
     PPtable() %>% gt() %>%
