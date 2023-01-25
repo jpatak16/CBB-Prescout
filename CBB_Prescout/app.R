@@ -130,7 +130,12 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                 tabPanel("Graphical Metric Comparison",
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header2")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
-                                  ) #end of header fluidRow
+                                  ), #end of header fluidRow
+                         sidebarLayout(
+                           sidebarPanel(radioButtons("WhichGraph", "Metric Comparison", MetricCompList),
+                                        checkboxInput("focus", "Focused View?")),
+                           mainPanel(plotOutput("MetricComp", height = "600px"))
+                           ) #end of sidebarLayout
                          ), #end of GMC tabPanel
                 
                 tabPanel("Player Personnel", 
