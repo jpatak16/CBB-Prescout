@@ -81,10 +81,36 @@ SR_team_stats = SR_team_stats %>% mutate(offense_x2p_percent = (offense_fg - off
 #standardize school names
 SR_team_stats = SR_team_stats %>% mutate(school = clean_school_names(school))
 
+#pull our schedule
+our_schedule = kp_team_schedule(our_team, year=year) %>% mutate(opponent = clean_school_names(opponent))
 
+#get graphic info for teams on our schedule, opp list, and our team
+graphic_info = cfbplotR::logo_ref %>%
+  filter(school %in% our_schedule$opponent | school %in% opponentList | school == our_team) %>%
+  mutate(school = clean_school_names(school))
 
+#change SR_team_stats school names to how they appear in graphic_info
+#these are just the ones I've found to be different so far; they must be manually changed
+SR_team_stats[30,1] = 'BYU'
+SR_team_stats[285,1] = 'SMU'
+SR_team_stats[281,1] = 'USC'
+SR_team_stats[259,1] = "Saint Mary's"
+SR_team_stats[341,1] = "VCU"
 
+#create data frame that will be used on the Graphical Metric Comparison page
+GMC = left_join(graphic_info, SR_team_stats, by= 'school')
 
+#find medians of all vars in GMC
+GMC_medians = data.frame()
+for(c in 2:ncol(SR_team_stats)){
+  a = pull(SR_team_stats, var = c)
+  GMC_medians[1,c-1] = median(a)
+}
+colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
+rm(a, c)
+
+#the list of options for our metric comparison plots
+MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
 
 
 

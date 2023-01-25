@@ -1,39 +1,3 @@
-
-
-
-#change team names in df to match with logo table
-team_stats[30,1] = 'BYU'
-team_stats[285,1] = 'SMU'
-team_stats[281,1] = 'USC'
-team_stats[259,1] = "Saint Mary's"
-team_stats[341,1] = "VCU"
-
-
-#get graphic info for schools that will be on our plot
-our_schedule = kp_team_schedule(our_team, year=year) %>% mutate(opponent = clean_school_names(opponent))
-team_info = cfbplotR::logo_ref %>% mutate(school = clean_school_names(school)) %>%
-  filter(school %in% our_schedule$opponent | school %in% opponentList | school == our_team) 
-
-combined = left_join(team_info, team_stats, by=c('school' = 'school'))
-
-#select only the stats we are going to use from our df
-combined = combined %>%
-  select(school, logo, type, color, alt_color, wordmark, offense_o_rtg, defense_o_rtg, offense_x2p_percent, offense_x3p_percent,
-         offense_x3p_ar, offense_ast_percent, offense_tov_percent, offense_stl_percent,
-         offense_blk_percent, offense_orb_percent, offense_drb_percent)
-
-#find medians of all vars for plot
-team_stats_meds = data.frame()
-for(c in 2:ncol(team_stats)){
-  a = pull(team_stats, var = c)
-  median(a)
-  team_stats_meds[1,c-1] = median(a)
-}
-colnames(team_stats_meds) <- colnames(team_stats)[2:69]
-team_stats_meds = team_stats_meds %>% select(offense_o_rtg, defense_o_rtg, offense_x2p_percent, offense_x3p_percent,
-                                             offense_x3p_ar, offense_ast_percent, offense_tov_percent, offense_stl_percent,
-                                             offense_blk_percent, offense_orb_percent, offense_drb_percent)
-
 #read headshot url table
 headshot_urls_db = read_xlsx("CBB_Prescout/headshot_url.xlsx")
 
@@ -46,11 +10,6 @@ alwaysShow = c("URL", "first", "last", "team")
 
 
 rm(advanced_defense, advanced_offense, basic_defense, basic_offense, advanced_defense_url, advanced_offense_url, basic_defense_url, basic_offense_url, c, a, team_info)
-
-#the list of options for our metric comparison plots
-MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
-
-
 
 
 
