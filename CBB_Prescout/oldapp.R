@@ -1,28 +1,6 @@
 #read headshot url table
 headshot_urls_db = read_xlsx("CBB_Prescout/headshot_url.xlsx")
 
-#list of options for filtering and sorting player personnel table
-TableFilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters")
-TableSortList = c("MpG")
-TableColumnList = c("Player Info", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense", "Player Comp")
-TableColumnListVecs = list(c("#", "Class", "Pos", "Height", "MpG"), c("PG", "SG", "SF", "PF", "CC"), c(), c(), c(), c(), c())
-alwaysShow = c("URL", "first", "last", "team")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

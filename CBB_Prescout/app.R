@@ -112,6 +112,13 @@ rm(a, c)
 #the list of options for our metric comparison plots
 MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
 
+#list of options for filtering and sorting player personnel table
+PPT_FilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters", "Lefties")
+PPT_SortList = c("MpG")
+PPT_ColumnList = c("Player Info", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense", "Player Comp")
+PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Hand", "MpG"), c("PG", "SG", "SF", "PF", "C"), c(), c(), c(), c(), c())
+PPT_alwaysShow = c("URL", "first", "last", "team")
+
 
 
 
@@ -121,7 +128,7 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 
 ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                 tabPanel("Matchup Selection", 
-                         fluidRow(column(3, selectizeInput("opponent", "Opponent", opponentList)),
+                         fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
                                   column(6, h1(strong("Pre-Scout Portal")), uiOutput("header")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ) #end of header fluidRow
@@ -142,8 +149,16 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header3")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         h5("Coming Soon")
-                         ), #end of PP tabPanel
+                         fluidRow(column(4, selectInput("filterPPT", "Filter", PPT_FilterList), 
+                                         sliderInput("minMinsPPT", "Min/G Minimum", value=5, min=0, max=40), 
+                                         style = "background-color:#f5f5f5"),
+                                  column(4, selectInput("sortPPT", "Sort", PPT_SortList), 
+                                         sliderInput("minGamesPPT", "Games Played Minimum", value=0, min=0, max=30), 
+                                         style = "background-color:#f5f5f5"),
+                                  column(4, checkboxGroupInput("columnsPPT", "Visible Columns", choices = PPT_ColumnList, selected = "Player Info"), 
+                                         style = "background-color:#f5f5f5")
+                                  ) #end of PPT sort/filter options fluidRow
+                         ), #end of PPT tabPanel
                 
                 tabPanel("Opponent Overview", 
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header4")),
@@ -157,14 +172,14 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
                          h5("Coming Soon")
-                         ), #end of PP tabPanel
+                         ), #end of SC tabPanel
                 
                 tabPanel("Lineups", 
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header6")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
                          h5("Coming Soon")
-                         ), #end of PP tabPanel
+                         ), #end of LU tabPanel
                 
                 ) #end of navbarPage
 
