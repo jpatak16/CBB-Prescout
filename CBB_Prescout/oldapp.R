@@ -41,9 +41,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
 
 
 server = function(input, output, session) {
-  #reactive expressions for changing opponent input
-  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent1) %>% .[[1,2]])
-  SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
+  
   
   #find player position
   #for kenpom functions, abbreviate "State" to "St."
@@ -86,9 +84,6 @@ server = function(input, output, session) {
                            left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% mutate(Player = gsub("\\.", "", Player)) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)), by=c('last', 'first')) %>%
                            mutate(PG = ifelse(PG==0, NA, PG*100), SG = ifelse(SG==0, NA, SG*100), SF = ifelse(SF==0, NA, SF*100), PF = ifelse(PF==0, NA, PF*100), CC = ifelse(CC==0, NA, CC*100)))
   
-  headshot_urls = reactive(headshot_urls_db %>%
-                             separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>%
-                             mutate(last = str_to_title(last)))
   
   #join headshots to PPtable
   PPtable_raw2 = reactive(left_join(PPtable_raw(), headshot_urls(), by=c("first", "last", "team"="Team")))

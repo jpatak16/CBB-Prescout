@@ -119,9 +119,8 @@ PPT_ColumnList = c("Player Info", "Positional Breakdown", "Shooting", "Playmakin
 PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Hand", "MpG"), c("PG", "SG", "SF", "PF", "C"), c(), c(), c(), c(), c())
 PPT_alwaysShow = c("URL", "first", "last", "team")
 
-
-
-
+#read headshot url table
+headshot_urls_db = read_xlsx("headshot_url.xlsx")
 
 
 
@@ -157,7 +156,8 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                          style = "background-color:#f5f5f5"),
                                   column(4, checkboxGroupInput("columnsPPT", "Visible Columns", choices = PPT_ColumnList, selected = "Player Info"), 
                                          style = "background-color:#f5f5f5")
-                                  ) #end of PPT sort/filter options fluidRow
+                                  ), #end of PPT sort/filter options fluidRow
+                         fluidRow(12, dataTableOutput("PPT_test"))
                          ), #end of PPT tabPanel
                 
                 tabPanel("Opponent Overview", 
@@ -250,6 +250,36 @@ server = function(input, output, session) {
         theme_bw()}
   }) #end of MetricComp output
   
+  #reactive expressions for SR data depending on opponent
+  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% .[[1,2]])
+  SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
+  
+  #creates a variable for opponent name when reffering to kp functions
+  opponent_kp = reactive(gsub(" State", " St.", input$opponent))
+  
+  #PPT Data coming from different sources
+  SR_PPT = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent) %>%
+                      select('#', Pos))
+  
+  KP_PPT = reactive(kp_team_players(opponent_kp(), year) %>%
+                      select(player, number, ht, wt, yr, g, s) %>% 
+                      # 5 steps to standardize player's names but not overwrite the original col of names
+                      mutate(player_join = gsub("\\.", "", player)) %>% 
+                      mutate(player_join = gsub("'", "", player_join)) %>%
+                      separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
+                      mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
+                      select(-first_join, -last_join))
+  
+  headshots_PPT = reactive(headshot_urls_db %>% filter(Team == input$opponent) %>%
+                             # 5 steps to standardize player's names but not overwrite the original col of names
+                             mutate(player_join = gsub("\\.", "", Player)) %>% 
+                             mutate(player_join = gsub("'", "", player_join)) %>%
+                             separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
+                             mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
+                             select(-first_join, -last_join))
+  
+  
+  output$PPT_test = renderDataTable(KP_PPT())
   
   } #end of server
 
