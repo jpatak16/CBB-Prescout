@@ -125,6 +125,10 @@ headshot_urls_db = read_xlsx("headshot_url.xlsx")
 
 
 
+
+
+
+
 ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                 tabPanel("Matchup Selection", 
                          fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
@@ -254,8 +258,9 @@ server = function(input, output, session) {
   opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% .[[1,2]])
   SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
   
-  #creates a variable for opponent name when reffering to kp functions
-  opponent_kp = reactive(gsub(" State", " St.", input$opponent))
+  #creates a variable for opponent name when referring to kp functions
+  opponent_kp = reactive(if(input$opponent == "UCONN"){"Connecticut"}
+                         else{gsub(" State", " St.", input$opponent)})
   
   #PPT Data coming from different sources
   SR_PPT = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent) %>%
@@ -294,14 +299,15 @@ server = function(input, output, session) {
   #find starters for last game the team played
   lastGdate = reactive(kp_team_schedule(opponent_kp(), year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
   opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>%
-                           filter(home_team_location == str_to_title(input$opponent) | away_team_location == str_to_title(input$opponent)) %>% .[[1,6]])
+                           filter(toupper(home_team_location) == toupper(input$opponent) | toupper(away_team_location) == toupper(input$opponent)) %>% .[[1,6]])
   lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% 
-                             filter(starter==TRUE))
+                             filter(starter==TRUE) %>%
+                             filter(toupper(team_short_display_name) == toupper(gsub(" St.", " St", opponent_kp())) |
+                                      toupper(team_short_display_name) == toupper(input$opponent)) %>%
+                             select("#" = athlete_jersey, starter))
+
   
-  ####starters pull doesn't work for UCONN or UCLA.. need to fix that
-  ### team names in lastGstarters don't use a period at the end of St.
-  
-  output$PPT_test = renderDataTable(lastGstarters())
+  output$PPT_test = renderDataTable(KP2_PPT())
   
   } #end of server
 

@@ -43,14 +43,6 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
 server = function(input, output, session) {
   
   
-  #get starters from opponent's last game
-  #different name formatting used for certain opponents
-  uconn = reactive(ifelse(input$opponent2=='Connecticut', "UConn", input$opponent2))
-  lastGdate = reactive(kp_team_schedule(opp_kp(), year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
-  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>% filter(home_team_location == input$opponent2 | away_team_location == input$opponent2 | home_team_location == uconn() | away_team_location == uconn()) %>% .[[1,6]])
-  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% filter(starter==TRUE) %>% filter(team_short_display_name==input$opponent2 | team_short_display_name==uconn() | team_short_display_name==opp_kp() | team_short_display_name==opp_kp2()) %>% 
-                             select(athlete_display_name, athlete_jersey, starter) %>% mutate(athlete_display_name = gsub("\\.", "", athlete_display_name)) %>% separate(athlete_display_name, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)) %>%
-                             mutate(athlete_jersey = as.numeric(athlete_jersey)) %>% rename('#' = athlete_jersey))
   
   #base table for personnel output
   PPtable_raw = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent2) %>%
