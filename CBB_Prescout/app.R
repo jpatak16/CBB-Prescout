@@ -4,7 +4,7 @@ p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
-opponentList = c("Washington State", "UCLA")
+opponentList = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
 opponentSRurl_db = read_xlsx("opp_url.xlsx")
 year=2023
 
@@ -278,8 +278,30 @@ server = function(input, output, session) {
                              mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
                              select(-first_join, -last_join))
   
+  #find player position
+  kp_pos = reactive(kp_team_depth_chart(opponent_kp(), year))
+  pos_pg = reactive(kp_pos() %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct, '#' = pg_number) %>% mutate(pos="PG") %>% filter(!is.na(first)))
+  pos_sg = reactive(kp_pos() %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct, '#' = sg_number) %>% mutate(pos="SG") %>% filter(!is.na(first)))
+  pos_sf = reactive(kp_pos() %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct, '#' = sf_number) %>% mutate(pos="SF") %>% filter(!is.na(first)))
+  pos_pf = reactive(kp_pos() %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct, '#' = pf_number) %>% mutate(pos="PF") %>% filter(!is.na(first)))
+  pos_c = reactive(kp_pos() %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct, '#' = c_number) %>% mutate(pos="C") %>% filter(!is.na(first)))
+  KP2_PPT = reactive(rbind(pos_pg(), pos_sg(), pos_sf(), pos_pf(), pos_c()) %>% 
+                       pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% 
+                       mutate(total=PG+SG+SF+PF+C) %>%
+                       mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-9] %>%
+                       select('#', PG, SG, SF, PF, C))
   
-  output$PPT_test = renderDataTable(KP_PPT())
+  #find starters for last game the team played
+  lastGdate = reactive(kp_team_schedule(opponent_kp(), year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
+  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>%
+                           filter(home_team_location == str_to_title(input$opponent) | away_team_location == str_to_title(input$opponent)) %>% .[[1,6]])
+  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% 
+                             filter(starter==TRUE))
+  
+  ####starters pull doesn't work for UCONN or UCLA.. need to fix that
+  ### team names in lastGstarters don't use a period at the end of St.
+  
+  output$PPT_test = renderDataTable(lastGstarters())
   
   } #end of server
 

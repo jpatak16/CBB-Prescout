@@ -43,21 +43,6 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
 server = function(input, output, session) {
   
   
-  #find player position
-  #for kenpom functions, abbreviate "State" to "St."
-  opp_kp = reactive(gsub(" State", " St.", input$opponent2))
-  opp_kp2 = reactive(gsub("\\.", "", opp_kp()))
-  opp_pos = reactive(kp_team_depth_chart(opp_kp(), year = year))
-  opp_pg = reactive(opp_pos() %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct, '#' = pg_number) %>% mutate(pos="PG") %>% filter(!is.na(first)))
-  opp_sg = reactive(opp_pos() %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct, '#' = sg_number) %>% mutate(pos="SG") %>% filter(!is.na(first)))
-  opp_sf = reactive(opp_pos() %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct, '#' = sf_number) %>% mutate(pos="SF") %>% filter(!is.na(first)))
-  opp_pf = reactive(opp_pos() %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct, '#' = pf_number) %>% mutate(pos="PF") %>% filter(!is.na(first)))
-  opp_c = reactive(opp_pos() %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct, '#' = c_number) %>% mutate(pos="C") %>% filter(!is.na(first)))
-  opp_pos2 = reactive(rbind(opp_pg(), opp_sg(), opp_sf(), opp_pf(), opp_c()) %>% pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% mutate(total=PG+SG+SF+PF+C) %>%
-                        mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-9] %>%
-                        #combine first and last name then separate so that any extra suffixes are handled the same way as they are when pulling from SR
-                        mutate(Player = paste(first, last, sep=" ")) %>% select(Player, '#', PG, SG, SF, PF, CC=C) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last))) 
-  
   #get starters from opponent's last game
   #different name formatting used for certain opponents
   uconn = reactive(ifelse(input$opponent2=='Connecticut', "UConn", input$opponent2))
