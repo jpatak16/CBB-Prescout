@@ -126,9 +126,6 @@ headshot_urls_db = read_xlsx("headshot_url.xlsx")
 
 
 
-
-
-
 ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                 tabPanel("Matchup Selection", 
                          fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
@@ -263,17 +260,17 @@ server = function(input, output, session) {
                          else{gsub(" State", " St.", input$opponent)})
   
   #PPT Data coming from different sources
-  SR_PPT = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent) %>%
-                      select('#', Pos))
-  
-  KP_PPT = reactive(kp_team_players(opponent_kp(), year) %>%
-                      select(player, number, ht, wt, yr, g, s) %>% 
+  SR_PPT = reactive(SRopponentTables()[[1]] %>%
+                      select('#', Player, Pos) %>%
                       # 5 steps to standardize player's names but not overwrite the original col of names
-                      mutate(player_join = gsub("\\.", "", player)) %>% 
+                      mutate(player_join = gsub("\\.", "", Player)) %>% 
                       mutate(player_join = gsub("'", "", player_join)) %>%
                       separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
                       mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
                       select(-first_join, -last_join))
+  
+  KP_PPT = reactive(kp_team_players(opponent_kp(), year) %>%
+                      select(number, ht, wt, yr, g, s))
   
   headshots_PPT = reactive(headshot_urls_db %>% filter(Team == input$opponent) %>%
                              # 5 steps to standardize player's names but not overwrite the original col of names
@@ -281,7 +278,7 @@ server = function(input, output, session) {
                              mutate(player_join = gsub("'", "", player_join)) %>%
                              separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
                              mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
-                             select(-first_join, -last_join))
+                             select(-first_join, -last_join, -Player))
   
   #find player position
   kp_pos = reactive(kp_team_depth_chart(opponent_kp(), year))
@@ -301,13 +298,20 @@ server = function(input, output, session) {
   opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>%
                            filter(toupper(home_team_location) == toupper(input$opponent) | toupper(away_team_location) == toupper(input$opponent)) %>% .[[1,6]])
   lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% 
+                             mutate(athlete_jersey = as.double(athlete_jersey)) %>%
                              filter(starter==TRUE) %>%
                              filter(toupper(team_short_display_name) == toupper(gsub(" St.", " St", opponent_kp())) |
                                       toupper(team_short_display_name) == toupper(input$opponent)) %>%
                              select("#" = athlete_jersey, starter))
+  
+  #join together all sources of info for PPT
+  PPT_df_temp1 = reactive(full_join(SR_PPT(), KP_PPT(), by = c("#"="number")))
+  PPT_df_temp2 = reactive(full_join(PPT_df_temp1(), headshots_PPT(), by = 'player_join'))
+  PPT_df_temp3 = reactive(full_join(PPT_df_temp2(), KP2_PPT(), by = '#'))
+  PPT_df_temp4 = reactive(left_join(PPT_df_temp3(), lastGstarters(), by = '#'))
 
   
-  output$PPT_test = renderDataTable(KP2_PPT())
+  output$PPT_test = renderDataTable(PPT_df_temp4())
   
   } #end of server
 
