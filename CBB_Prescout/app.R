@@ -269,8 +269,17 @@ server = function(input, output, session) {
                       mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
                       select(-first_join, -last_join))
   
+  SR2_PPT = reactive(SRopponentTables()[[6]] %>%
+                       select(Player, G, GS, MpG = MP) %>%
+                       # 5 steps to standardize player's names but not overwrite the original col of names
+                       mutate(player_join = gsub("\\.", "", Player)) %>% 
+                       mutate(player_join = gsub("'", "", player_join)) %>%
+                       separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
+                       mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
+                       select(-first_join, -last_join, -Player))
+  
   KP_PPT = reactive(kp_team_players(opponent_kp(), year) %>%
-                      select(number, ht, wt, yr, g, s))
+                      select(number, ht, wt, yr))
   
   headshots_PPT = reactive(headshot_urls_db %>% filter(Team == input$opponent) %>%
                              # 5 steps to standardize player's names but not overwrite the original col of names
@@ -305,13 +314,35 @@ server = function(input, output, session) {
                              select("#" = athlete_jersey, starter))
   
   #join together all sources of info for PPT
-  PPT_df_temp1 = reactive(full_join(SR_PPT(), KP_PPT(), by = c("#"="number")))
-  PPT_df_temp2 = reactive(full_join(PPT_df_temp1(), headshots_PPT(), by = 'player_join'))
-  PPT_df_temp3 = reactive(full_join(PPT_df_temp2(), KP2_PPT(), by = '#'))
-  PPT_df_temp4 = reactive(left_join(PPT_df_temp3(), lastGstarters(), by = '#'))
+  PPT_data = reactive(SR_PPT() %>%
+                        full_join(SR2_PPT(), by = 'player_join') %>%
+                        full_join(KP_PPT(), by = c('#' = 'number')) %>%
+                        full_join(headshots_PPT(), by = 'player_join') %>%
+                        full_join(KP2_PPT(), by = '#') %>%
+                        left_join(lastGstarters(), by = '#') %>%
+                        mutate('All Players' = 1,
+                               "Guards" = ifelse(PG+SG>.7, 1, 0),
+                               "Bigs" = ifelse(C+PF>.8 & C>0 , 1, 0),
+                               "Wings" = ifelse(Guards+Bigs==0, 1, 0),
+                               "Starters" = ifelse(is.na(starter), 0, 1),
+                               "Lefties" = 0) %>%
+                        select(-starter, -player_join))
+  
+  #filter and sort PPtable_raw before making it a gt object
+  filter_PPT = reactive({
+    tibble(TCL = TableColumnList, TCLV = TableColumnListVecs) %>%
+      filter(TCL %in% input$columnsPPT) %>%
+      pull(TCLV) %>%
+      unlist()
+  })
+  sort_PPT = reactive(PPT_data() %>% 
+                        filter(.data[[input$filterPPT]] == 1) %>%
+                        filter(.data[["MpG"]] > input$minMinsPPT) %>%
+                        arrange(desc(.data[[input$sortPPT]])) %>%
+                        select(alwaysShow, all_of(filter_PPT())))
 
   
-  output$PPT_test = renderDataTable(PPT_df_temp4())
+  output$PPT_test = renderDataTable(PPT_data())
   
   } #end of server
 

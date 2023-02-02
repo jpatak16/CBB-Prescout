@@ -44,34 +44,6 @@ server = function(input, output, session) {
   
   
   
-  #base table for personnel output
-  PPtable_raw = reactive(SRopponentTables()[[1]] %>% mutate(team=input$opponent2) %>%
-                           select(team, Player, "#", Class, Pos, Height) %>%
-                           mutate(Player = gsub("\\.", "", Player)) %>%
-                           separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>%
-                           mutate(last = str_to_title(last)) %>% 
-                           right_join(opp_pos2(), by=c('#')) %>% select(-first.y, -last.y) %>% rename(first = first.x, last = last.x) %>%
-                           #create dummy variables for the TableFilterList to filter by
-                           mutate("All Players" = 1,
-                                  "Guards" = ifelse(PG+SG>.6, 1, 0),
-                                  "Bigs" = ifelse(CC+PF>.75 & CC>0 , 1, 0),
-                                  "Wings" = ifelse(Guards+Bigs==0, 1, 0)) %>%
-                           left_join(lastGstarters(), by=c('#')) %>% select(-first.y, -last.y) %>% rename(first = first.x, last = last.x) %>%
-                           mutate("Starters" = ifelse(starter==TRUE, 1, 0)) %>% select(-starter) %>%
-                           left_join(SRopponentTables()[[6]] %>% select(Player, "MpG" = MP) %>% mutate(Player = gsub("\\.", "", Player)) %>% separate(Player, into = c("first","last"), extra = "drop", sep = "[^\\w']") %>% mutate(last = str_to_title(last)), by=c('last', 'first')) %>%
-                           mutate(PG = ifelse(PG==0, NA, PG*100), SG = ifelse(SG==0, NA, SG*100), SF = ifelse(SF==0, NA, SF*100), PF = ifelse(PF==0, NA, PF*100), CC = ifelse(CC==0, NA, CC*100)))
-  
-  
-  #join headshots to PPtable
-  PPtable_raw2 = reactive(left_join(PPtable_raw(), headshot_urls(), by=c("first", "last", "team"="Team")))
-  
-  #filter and sort PPtable_raw before making it a gt object
-  selected_cols = reactive({
-    tibble(TCL = TableColumnList, TCLV = TableColumnListVecs) %>%
-      filter(TCL %in% input$columnsPersonnel) %>%
-      pull(TCLV) %>%
-      unlist()
-  })
   
   PPtable = reactive(PPtable_raw2() %>% 
                        filter(.data[[input$filterPersonnel]] == 1) %>%
