@@ -115,9 +115,9 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 #list of options for filtering and sorting player personnel table
 PPT_FilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters", "Lefties")
 PPT_SortList = c("MpG")
-PPT_ColumnList = c("Player Info", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense", "Player Comp")
-PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Hand", "MpG"), c("PG", "SG", "SF", "PF", "C"), c(), c(), c(), c(), c())
-PPT_alwaysShow = c("URL", "first", "last", "team")
+PPT_ColumnList = c("Player Info", "Usage", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense", "Player Comp")
+PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"), c("GP", "GS", "MpG"), c("PG", "SG", "SF", "PF", "C"), c(), c(), c(), c(), c())
+PPT_alwaysShow = c("URL", "first", "last", "Team")
 
 #read headshot url table
 headshot_urls_db = read_xlsx("headshot_url.xlsx")
@@ -158,7 +158,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                   column(4, checkboxGroupInput("columnsPPT", "Visible Columns", choices = PPT_ColumnList, selected = "Player Info"), 
                                          style = "background-color:#f5f5f5")
                                   ), #end of PPT sort/filter options fluidRow
-                         fluidRow(12, dataTableOutput("PPT_test"))
+                         fluidRow(12, gt_output("PlayerPersonnel"))
                          ), #end of PPT tabPanel
                 
                 tabPanel("Opponent Overview", 
@@ -326,11 +326,24 @@ server = function(input, output, session) {
                                "Wings" = ifelse(Guards+Bigs==0, 1, 0),
                                "Starters" = ifelse(is.na(starter), 0, 1),
                                "Lefties" = 0) %>%
-                        select(-starter, -player_join))
+                        mutate(PG = as.numeric(ifelse(PG==0, NA, PG*100)),
+                               SG = as.numeric(ifelse(SG==0, NA, SG*100)),
+                               SF = as.numeric(ifelse(SF==0, NA, SF*100)),
+                               PF = as.numeric(ifelse(PF==0, NA, PF*100)),
+                               C = as.numeric(ifelse(C==0, NA, C*100))) %>%
+                        select(-starter, -player_join) %>%
+                        separate(Player, into = c('first', 'last'), sep = "[^\\w'.-]", extra = 'merge') %>%
+                        #order columns into the order I want them to appear in the PPT
+                        select(URL, first, last, Team, 
+                               "#", Class=yr, Pos, Height=ht, Weight=wt, 
+                               GP=G, GS, MpG,
+                               Pos_PG = PG, Pos_SG = SG, Pos_SF = SF, Pos_PF = PF, Pos_C = C,
+                               "All Players", Guards, Wings, Bigs, Starters, Lefties))
+                        
   
   #filter and sort PPtable_raw before making it a gt object
   filter_PPT = reactive({
-    tibble(TCL = TableColumnList, TCLV = TableColumnListVecs) %>%
+    tibble(TCL = PPT_ColumnList, TCLV = PPT_ColumnListVecs) %>%
       filter(TCL %in% input$columnsPPT) %>%
       pull(TCLV) %>%
       unlist()
@@ -339,10 +352,25 @@ server = function(input, output, session) {
                         filter(.data[[input$filterPPT]] == 1) %>%
                         filter(.data[["MpG"]] > input$minMinsPPT) %>%
                         arrange(desc(.data[[input$sortPPT]])) %>%
-                        select(alwaysShow, all_of(filter_PPT())))
+                        select(PPT_alwaysShow, all_of(filter_PPT())))
 
   
-  output$PPT_test = renderDataTable(PPT_data())
+  output$PlayerPersonnel = render_gt({
+    sort_PPT() %>% gt() %>%
+      gt_merge_stack_team_color(first, last, Team) %>%
+      gt_img_rows(columns = URL, img_source = "web", height = 90) %>%
+      cols_hide(Team) %>%
+      fmt_number(columns = starts_with("Pos_", ignore.case = FALSE), decimals=0, drop_trailing_zeros = T) %>%
+      tab_style(
+        style = list(
+          cell_fill(color = "lightgrey")), locations = cells_body(
+            columns = starts_with("Pos_", ignore.case = FALSE))) %>%
+      sub_missing(
+        columns = starts_with("Pos_", ignore.case = FALSE), missing_text = " ") %>%
+      cols_label(URL = "",
+                 first = "Name",
+                 Pos_PG = "PG")
+  })
   
   } #end of server
 
