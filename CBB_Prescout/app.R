@@ -153,7 +153,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                          sliderInput("minMinsPPT", "Min/G Minimum", value=5, min=0, max=40), 
                                          style = "background-color:#f5f5f5"),
                                   column(4, selectInput("sortPPT", "Sort", PPT_SortList), 
-                                         sliderInput("minGamesPPT", "Games Played Minimum", value=0, min=0, max=30), 
+                                         uiOutput("minGP_PPT_out"), 
                                          style = "background-color:#f5f5f5"),
                                   column(4, checkboxGroupInput("columnsPPT", "Visible Columns", choices = PPT_ColumnList, selected = "Player Info"), 
                                          style = "background-color:#f5f5f5")
@@ -350,9 +350,17 @@ server = function(input, output, session) {
   })
   sort_PPT = reactive(PPT_data() %>% 
                         filter(.data[[input$filterPPT]] == 1) %>%
-                        filter(.data[["MpG"]] > input$minMinsPPT) %>%
+                        filter(.data[["MpG"]] >= input$minMinsPPT) %>%
+                        filter(.data[["GP"]] >= input$minGP_PPT_in) %>%
                         arrange(desc(.data[[input$sortPPT]])) %>%
                         select(PPT_alwaysShow, all_of(filter_PPT())))
+  
+  #find how many games the opponent has played this season
+  opp_n_games = reactive(kp_team_schedule(opponent_kp(), year) %>% 
+    filter(!is.na(w)) %>%
+    nrow() %>% as.numeric())
+  
+  output$minGP_PPT_out = renderUI({sliderInput("minGP_PPT_in", "Games Played Minimum", value=0, min=0, max=opp_n_games())})
 
   
   output$PlayerPersonnel = render_gt({
@@ -375,15 +383,12 @@ server = function(input, output, session) {
               starts_with("PF") & ends_with("PF") |
               starts_with("C") & ends_with("C"))) %>%
       sub_missing(
-        columns = starts_with("PG") & ends_with("PG") |
-          starts_with("SG") & ends_with("SG") |
-          starts_with("SF") & ends_with("SF") |
-          starts_with("PF") & ends_with("PF") |
-          starts_with("C") & ends_with("C"), 
+        columns = everything(), 
         missing_text = " ") %>%
       cols_label(URL = "",
                  first = "Name")
   })
+  
   
   } #end of server
 
