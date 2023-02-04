@@ -337,7 +337,7 @@ server = function(input, output, session) {
                         select(URL, first, last, Team, 
                                "#", Class=yr, Pos, Height=ht, Weight=wt, 
                                GP=G, GS, MpG,
-                               Pos_PG = PG, Pos_SG = SG, Pos_SF = SF, Pos_PF = PF, Pos_C = C,
+                               PG, SG, SF, PF, C,
                                "All Players", Guards, Wings, Bigs, Starters, Lefties))
                         
   
@@ -360,16 +360,29 @@ server = function(input, output, session) {
       gt_merge_stack_team_color(first, last, Team) %>%
       gt_img_rows(columns = URL, img_source = "web", height = 90) %>%
       cols_hide(Team) %>%
-      fmt_number(columns = starts_with("Pos_", ignore.case = FALSE), decimals=0, drop_trailing_zeros = T) %>%
+      fmt_number(columns = starts_with("PG") & ends_with("PG") |
+                   starts_with("SG") & ends_with("SG") |
+                   starts_with("SF") & ends_with("SF") |
+                   starts_with("PF") & ends_with("PF") |
+                   starts_with("C") & ends_with("C"), 
+                 decimals=0, drop_trailing_zeros = T) %>%
       tab_style(
         style = list(
           cell_fill(color = "lightgrey")), locations = cells_body(
-            columns = starts_with("Pos_", ignore.case = FALSE))) %>%
+            columns = starts_with("PG") & ends_with("PG") |
+              starts_with("SG") & ends_with("SG") |
+              starts_with("SF") & ends_with("SF") |
+              starts_with("PF") & ends_with("PF") |
+              starts_with("C") & ends_with("C"))) %>%
       sub_missing(
-        columns = starts_with("Pos_", ignore.case = FALSE), missing_text = " ") %>%
+        columns = starts_with("PG") & ends_with("PG") |
+          starts_with("SG") & ends_with("SG") |
+          starts_with("SF") & ends_with("SF") |
+          starts_with("PF") & ends_with("PF") |
+          starts_with("C") & ends_with("C"), 
+        missing_text = " ") %>%
       cols_label(URL = "",
-                 first = "Name",
-                 Pos_PG = "PG")
+                 first = "Name")
   })
   
   } #end of server
