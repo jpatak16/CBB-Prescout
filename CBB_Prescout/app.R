@@ -116,7 +116,7 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 PPT_FilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters", "Lefties")
 PPT_SortList = c("MpG")
 PPT_ColumnList = c("Player Info", "Usage", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense", "Player Comp")
-PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"), c("GP", "GS", "MpG"), c("PG", "SG", "SF", "PF", "C"), c(), c(), c(), c(), c())
+PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"), c("GP", "GS", "MpG", "Poss%", "USG%"), c("PG", "SG", "SF", "PF", "C"), c("2P%", "3P%", "3PAr", "eFG%", "TS%", "FT%", "FTr"), c(), c(), c(), c())
 PPT_alwaysShow = c("URL", "first", "last", "Team")
 
 #read headshot url table
@@ -270,7 +270,16 @@ server = function(input, output, session) {
                       select(-first_join, -last_join))
   
   SR2_PPT = reactive(SRopponentTables()[[6]] %>%
-                       select(Player, G, GS, MpG = MP) %>%
+                       select(Player, G, GS, MpG = MP, "2P%", "3P%", "FT%") %>%
+                       # 5 steps to standardize player's names but not overwrite the original col of names
+                       mutate(player_join = gsub("\\.", "", Player)) %>% 
+                       mutate(player_join = gsub("'", "", player_join)) %>%
+                       separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
+                       mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
+                       select(-first_join, -last_join, -Player))
+  
+  SR3_PPT = reactive(SRopponentTables()[[14]] %>%
+                       select(Player, "USG%", "eFG%", "TS%", "3PAr", "FTr") %>%
                        # 5 steps to standardize player's names but not overwrite the original col of names
                        mutate(player_join = gsub("\\.", "", Player)) %>% 
                        mutate(player_join = gsub("'", "", player_join)) %>%
@@ -279,7 +288,7 @@ server = function(input, output, session) {
                        select(-first_join, -last_join, -Player))
   
   KP_PPT = reactive(kp_team_players(opponent_kp(), year) %>%
-                      select(number, ht, wt, yr))
+                      select(number, ht, wt, yr, poss_pct))
   
   headshots_PPT = reactive(headshot_urls_db %>% filter(Team == input$opponent) %>%
                              # 5 steps to standardize player's names but not overwrite the original col of names
@@ -316,6 +325,7 @@ server = function(input, output, session) {
   #join together all sources of info for PPT
   PPT_data = reactive(SR_PPT() %>%
                         full_join(SR2_PPT(), by = 'player_join') %>%
+                        full_join(SR3_PPT(), by = 'player_join') %>%
                         full_join(KP_PPT(), by = c('#' = 'number')) %>%
                         full_join(headshots_PPT(), by = 'player_join') %>%
                         full_join(KP2_PPT(), by = '#') %>%
@@ -336,8 +346,9 @@ server = function(input, output, session) {
                         #order columns into the order I want them to appear in the PPT
                         select(URL, first, last, Team, 
                                "#", Class=yr, Pos, Height=ht, Weight=wt, 
-                               GP=G, GS, MpG,
+                               GP=G, GS, MpG, "Poss%"=poss_pct, "USG%",
                                PG, SG, SF, PF, C,
+                               "2P%", "3P%", "3PAr", "eFG%", "TS%", "FT%", FTr,
                                "All Players", Guards, Wings, Bigs, Starters, Lefties))
                         
   
@@ -388,6 +399,8 @@ server = function(input, output, session) {
       cols_label(URL = "",
                  first = "Name")
   })
+  
+  output$test = renderDataTable(SR_PPT())
   
   
   } #end of server
