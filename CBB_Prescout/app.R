@@ -116,7 +116,11 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 PPT_FilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters", "Lefties")
 PPT_SortList = c("MpG")
 PPT_ColumnList = c("Player Info", "Usage", "Positional Breakdown", "Shooting", "Playmaking", "Dribble Drive Direction", "Defense", "Player Comp")
-PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"), c("GP", "GS", "MpG", "Poss%", "USG%"), c("PG", "SG", "SF", "PF", "C"), c("2P%", "3P%", "3PAr", "eFG%", "TS%", "FT%", "FTr"), c(), c(), c(), c())
+PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"), 
+                          c("GP", "GS", "MpG", "Poss%", "USG%"), 
+                          c("PG", "SG", "SF", "PF", "C"), 
+                          c("2P%", "3P%", "3PAr", "eFG%", "TS%", "FT%", "FTr"),
+                          c("ApG", "AST:TO", "AST%", "TOV%"), c(), c(), c())
 PPT_alwaysShow = c("URL", "first", "last", "Team")
 
 #read headshot url table
@@ -153,7 +157,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                          sliderInput("minMinsPPT", "Min/G Minimum", value=5, min=0, max=40), 
                                          style = "background-color:#f5f5f5"),
                                   column(4, selectInput("sortPPT", "Sort", PPT_SortList), 
-                                         uiOutput("minGP_PPT_out"), 
+                                         sliderInput("minGames_PPT", "Games Played Minimum", value=1, min=0, max=40), #uiOutput("minGP_PPT_out"), 
                                          style = "background-color:#f5f5f5"),
                                   column(4, checkboxGroupInput("columnsPPT", "Visible Columns", choices = PPT_ColumnList, selected = "Player Info"), 
                                          style = "background-color:#f5f5f5")
@@ -270,7 +274,7 @@ server = function(input, output, session) {
                       select(-first_join, -last_join))
   
   SR2_PPT = reactive(SRopponentTables()[[6]] %>%
-                       select(Player, G, GS, MpG = MP, "2P%", "3P%", "FT%") %>%
+                       select(Player, G, GS, MpG = MP, "2P%", "3P%", "FT%", ApG=AST, TOV) %>%
                        # 5 steps to standardize player's names but not overwrite the original col of names
                        mutate(player_join = gsub("\\.", "", Player)) %>% 
                        mutate(player_join = gsub("'", "", player_join)) %>%
@@ -279,7 +283,7 @@ server = function(input, output, session) {
                        select(-first_join, -last_join, -Player))
   
   SR3_PPT = reactive(SRopponentTables()[[14]] %>%
-                       select(Player, "USG%", "eFG%", "TS%", "3PAr", "FTr") %>%
+                       select(Player, "USG%", "eFG%", "TS%", "3PAr", "FTr", "AST%", "TOV%") %>%
                        # 5 steps to standardize player's names but not overwrite the original col of names
                        mutate(player_join = gsub("\\.", "", Player)) %>% 
                        mutate(player_join = gsub("'", "", player_join)) %>%
@@ -341,6 +345,9 @@ server = function(input, output, session) {
                                SF = as.numeric(ifelse(SF==0, NA, SF*100)),
                                PF = as.numeric(ifelse(PF==0, NA, PF*100)),
                                C = as.numeric(ifelse(C==0, NA, C*100))) %>%
+                        mutate(G = ifelse(!is.na(G), G, 0),
+                               MpG = ifelse(!is.na(MpG), MpG, 0),
+                               "AST:TO" = round(ApG / TOV, 2)) %>%
                         select(-starter, -player_join) %>%
                         separate(Player, into = c('first', 'last'), sep = "[^\\w'.-]", extra = 'merge') %>%
                         #order columns into the order I want them to appear in the PPT
@@ -349,6 +356,7 @@ server = function(input, output, session) {
                                GP=G, GS, MpG, "Poss%"=poss_pct, "USG%",
                                PG, SG, SF, PF, C,
                                "2P%", "3P%", "3PAr", "eFG%", "TS%", "FT%", FTr,
+                               ApG, "AST:TO", "AST%", "TOV%",
                                "All Players", Guards, Wings, Bigs, Starters, Lefties))
                         
   
@@ -361,8 +369,8 @@ server = function(input, output, session) {
   })
   sort_PPT = reactive(PPT_data() %>% 
                         filter(.data[[input$filterPPT]] == 1) %>%
+                        filter(.data[["GP"]] >= input$minGames_PPT) %>%
                         filter(.data[["MpG"]] >= input$minMinsPPT) %>%
-                        filter(.data[["GP"]] >= input$minGP_PPT_in) %>%
                         arrange(desc(.data[[input$sortPPT]])) %>%
                         select(PPT_alwaysShow, all_of(filter_PPT())))
   
@@ -371,7 +379,8 @@ server = function(input, output, session) {
     filter(!is.na(w)) %>%
     nrow() %>% as.numeric())
   
-  output$minGP_PPT_out = renderUI({sliderInput("minGP_PPT_in", "Games Played Minimum", value=0, min=0, max=opp_n_games())})
+  #take this out due to it messing up my R session constatly. I was not able to figure out why
+  #output$minGP_PPT_out = renderUI({sliderInput("minGP_PPT_in", "Games Played Minimum", value=0, min=0, max=opp_n_games())})
 
   
   output$PlayerPersonnel = render_gt({
@@ -400,7 +409,7 @@ server = function(input, output, session) {
                  first = "Name")
   })
   
-  output$test = renderDataTable(SR_PPT())
+  output$test = renderDataTable(PPT_data())
   
   
   } #end of server
