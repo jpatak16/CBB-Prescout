@@ -116,7 +116,7 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 PPT_FilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters", "Lefties")
 PPT_SortList = c("MPG", "USG%", "PER", "BPM", "PPG", "3P%", "3PAr", "AST:TO", "TRB%")
 PPT_ColumnList = c("Player Info", "Usage", "Positional Breakdown", "Advanced", "Scoring", "Shooting", "Playmaking", "Rebounding", "Defense")
-PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"), 
+PPT_ColumnListVecs = list(c("Class", "Pos", "Height", "Weight"), 
                           c("GP", "GS", "MPG", "Poss%", "USG%"), 
                           c("PG", "SG", "SF", "PF", "C"), 
                           c("PER", "OBPM", "DBPM", "BPM"),
@@ -125,7 +125,7 @@ PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"),
                           c("ApG", "AST:TO", "AST%", "TOV%"), 
                           c("ORB%", "DRB%", "TRB%"), 
                           c("STL%", "BLK%", "FC/40"))
-PPT_alwaysShow = c("URL", "first", "last", "Team")
+PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
 #read headshot url table
 headshot_urls_db = read_xlsx("headshot_url.xlsx")
@@ -278,7 +278,7 @@ server = function(input, output, session) {
                       select(-first_join, -last_join))
   
   SR2_PPT = reactive(SRopponentTables()[[6]] %>%
-                       select(Player, G, GS, MPG=MP, "2P%", "3P%", "FT%", ApG=AST, TOV, PPG=PTS) %>%
+                       select(Player, G, GS, MPG=MP, twoPperc="2P%", threePperc="3P%", ftperc="FT%", ApG=AST, TOV, PPG=PTS) %>%
                        # 5 steps to standardize player's names but not overwrite the original col of names
                        mutate(player_join = gsub("\\.", "", Player)) %>% 
                        mutate(player_join = gsub("'", "", player_join)) %>%
@@ -287,7 +287,7 @@ server = function(input, output, session) {
                        select(-first_join, -last_join, -Player))
   
   SR3_PPT = reactive(SRopponentTables()[[14]] %>%
-                       select(Player, "USG%", "eFG%", "TS%", "3PAr", "FTr", "AST%", "TOV%", 
+                       select(Player, "USG%", eFGperc="eFG%", tsperc="TS%", threePAr="3PAr", "FTr", "AST%", "TOV%", 
                               "PER", "OBPM", "DBPM", "BPM", "ORB%", "DRB%", "TRB%", "STL%", "BLK%") %>%
                        # 5 steps to standardize player's names but not overwrite the original col of names
                        mutate(player_join = gsub("\\.", "", Player)) %>% 
@@ -350,19 +350,26 @@ server = function(input, output, session) {
                                SF = as.numeric(ifelse(SF==0, NA, SF*100)),
                                PF = as.numeric(ifelse(PF==0, NA, PF*100)),
                                C = as.numeric(ifelse(C==0, NA, C*100))) %>%
+                        mutate(twoPperc = round(twoPperc*100, 1),
+                               threePperc = round(threePperc*100, 1),
+                               threePAr = round(threePAr*100, 1),
+                               eFGperc = round(eFGperc*100, 1),
+                               tsperc = round(tsperc*100, 1),
+                               ftperc = round(ftperc*100, 1),
+                               FTr = round(FTr*100, 1)) %>%
                         mutate(G = ifelse(!is.na(G), G, 0),
                                MPG = ifelse(!is.na(MPG), MPG, 0),
                                "AST:TO" = round(ApG / TOV, 2)) %>%
                         select(-starter, -player_join) %>%
                         separate(Player, into = c('first', 'last'), sep = "[^\\w'.-]", extra = 'merge') %>%
                         #order columns into the order I want them to appear in the PPT
-                        select(URL, first, last, Team, 
-                               "#", Class=yr, Pos, Height=ht, Weight=wt, 
+                        select("#", URL, first, last, Team, 
+                               Class=yr, Pos, Height=ht, Weight=wt, 
                                GP=G, GS, MPG, "Poss%"=poss_pct, "USG%",
                                PG, SG, SF, PF, C,
                                PER, OBPM, DBPM, BPM,
                                PPG, "FD/40"=f_dper40,
-                               "2P%", "3P%", "3PAr", "eFG%", "TS%", "FT%", FTr,
+                               "2P%"=twoPperc, "3P%"=threePperc, "3PAr"=threePAr, "eFG%"=eFGperc, "TS%"=tsperc, "FT%"=ftperc, FTr,
                                ApG, "AST:TO", "AST%", "TOV%",
                                "ORB%", "DRB%", "TRB%",
                                "STL%", "BLK%", "FC/40"=f_cper40,
@@ -391,38 +398,35 @@ server = function(input, output, session) {
   #take this out due to it messing up my R session constantly. I was not able to figure out why
   output$minGP_PPT_out = renderUI({sliderInput("minGP_PPT_in", "Games Played Minimum", value=0, min=0, max=opp_n_games())})
 
+  #color for opponent
+  opp_color = reactive(ifelse(nrow(graphic_info %>% filter(school == input$opponent)) == 1,
+                              graphic_info %>% filter(school == input$opponent) %>% .[[1,4]], "black"))
   
-  output$PlayerPersonnel = render_gt({
+  PPT_v1 = reactive(
     sort_PPT() %>% gt() %>%
+      #formatting for player name
       gt_merge_stack_team_color(first, last, Team) %>%
+      #player headshot
       gt_img_rows(columns = URL, img_source = "web", height = 90) %>%
       cols_hide(Team) %>%
+      #rounding
       fmt_number(columns = starts_with("PG") & ends_with("PG") |
                    starts_with("SG") & ends_with("SG") |
                    starts_with("SF") & ends_with("SF") |
                    starts_with("PF") & ends_with("PF") |
                    starts_with("C") & ends_with("C"), 
                  decimals=0, drop_trailing_zeros = T) %>%
-      tab_style(
-        style = list(
-          cell_fill(color = "lightgrey")), locations = cells_body(
-            columns = starts_with("PG") & ends_with("PG") |
-              starts_with("SG") & ends_with("SG") |
-              starts_with("SF") & ends_with("SF") |
-              starts_with("PF") & ends_with("PF") |
-              starts_with("C") & ends_with("C"))) %>%
+      #empty cells dont have NA values displayed
       sub_missing(
         columns = everything(), 
         missing_text = " ") %>%
       cols_label(URL = "",
                  first = "Name") %>%
-      gt_color_rows(columns = starts_with(input$sortPPT) & ends_with(input$sortPPT), 
-                    palette = c("red", "white", "darkgreen"),
-                    domain = PPT_data()[[input$sortPPT]]) %>%
+      #left and right borders for each group
       tab_style(
         style = list(
           cell_borders(sides = "left")), locations = cells_body(
-            columns = starts_with("#") & ends_with("#") |
+            columns = starts_with("Class") & ends_with("Class") |
               starts_with("GP") & ends_with("GP") |
               starts_with("PG") & ends_with("PG") |
               starts_with("PER") & ends_with("PER") |
@@ -443,10 +447,10 @@ server = function(input, output, session) {
               starts_with("TOV%") & ends_with("TOV%") |
               starts_with("TRB%") & ends_with("TRB%") |
               starts_with("FC/40") & ends_with("FC/40"))) %>%
+      #group title for each group
       tab_spanner(
         label = "Player Info",
-        columns = c(starts_with("#") & ends_with("#"),
-                    starts_with("Class") & ends_with("Class"),
+        columns = c(starts_with("Class") & ends_with("Class"),
                     starts_with("Pos") & ends_with("Pos"),
                     starts_with("Height") & ends_with("Height"),
                     starts_with("Weight") & ends_with("Weight"))) %>%
@@ -499,16 +503,47 @@ server = function(input, output, session) {
         columns = c(starts_with("STL%") & ends_with("STL%"),
                     starts_with("BLK%") & ends_with("BLK%"),
                     starts_with("FC/40") & ends_with("FC/40"))) %>%
+      #increase horizontal spacing for each cell
       tab_style(
-        style = cell_text(size = pct(125)),
+        style = cell_text(size = pct(115)),
         locations = cells_column_labels()) %>%
+      #center all cell values
       cols_align(
         align = "center",
-        columns = everything())
-    
-  })
+        columns = everything()) %>%
+      #formatting for jersey number cell
+      tab_style(
+        style = list(
+          cell_text(color = opp_color(),
+                    weight = "bolder",
+                    size = "x-large")),
+        locations = cells_body(
+          columns = "#",
+          rows = everything()))
+    )
   
-  output$test = renderDataTable(PPT_data())
+  #how many columns are in our mostly finished gt table
+  PPT_v1_cols = reactive(ncol(PPT_v1()$'_data'))
+  
+  #format column shading
+  output$PlayerPersonnel = render_gt(PPT_v1() %>%
+                                       tab_style(
+                                         style = list(
+                                           cell_fill(color = "grey95")), locations = cells_body(
+                                             columns = if(PPT_v1_cols()!=5){seq(6,PPT_v1_cols(),2)}else{c(5)})) %>%
+                                       tab_style(
+                                         style = list(
+                                           cell_fill(color = "grey90")), locations = cells_body(
+                                             columns = starts_with("PG") & ends_with("PG") |
+                                               starts_with("SG") & ends_with("SG") |
+                                               starts_with("SF") & ends_with("SF") |
+                                               starts_with("PF") & ends_with("PF") |
+                                               starts_with("C") & ends_with("C"))) %>%
+                                       gt_color_rows(columns = starts_with(input$sortPPT) & ends_with(input$sortPPT), 
+                                                     palette = c("red", "white", "darkgreen"),
+                                                     domain = PPT_data()[[input$sortPPT]]))
+  
+  output$test = renderText(PPT_v1_cols())
   
   
   } #end of server
