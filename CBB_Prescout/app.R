@@ -1,6 +1,6 @@
 library(shiny)
 library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR)
+p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR, paletteer)
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
@@ -114,7 +114,7 @@ MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL
 
 #list of options for filtering and sorting player personnel table
 PPT_FilterList = c("All Players", "Guards", "Wings", "Bigs", "Starters", "Lefties")
-PPT_SortList = c("MPG")
+PPT_SortList = c("MPG", "USG%", "PER", "BPM", "PPG", "3P%", "3PAr", "AST:TO", "TRB%")
 PPT_ColumnList = c("Player Info", "Usage", "Positional Breakdown", "Advanced", "Scoring", "Shooting", "Playmaking", "Rebounding", "Defense")
 PPT_ColumnListVecs = list(c("#", "Class", "Pos", "Height", "Weight"), 
                           c("GP", "GS", "MPG", "Poss%", "USG%"), 
@@ -160,7 +160,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(4, selectInput("filterPPT", "Filter", PPT_FilterList), 
                                          sliderInput("minMinsPPT", "Min/G Minimum", value=5, min=0, max=40), 
                                          style = "background-color:#f5f5f5"),
-                                  column(4, selectInput("sortPPT", "Sort", PPT_SortList), 
+                                  column(4, selectInput("sortPPT", "Sort", PPT_SortList, selected = "MPG"), 
                                          uiOutput("minGP_PPT_out"), 
                                          style = "background-color:#f5f5f5"),
                                   column(4, checkboxGroupInput("columnsPPT", "Visible Columns", choices = PPT_ColumnList, selected = "Player Info"), 
@@ -415,7 +415,10 @@ server = function(input, output, session) {
         columns = everything(), 
         missing_text = " ") %>%
       cols_label(URL = "",
-                 first = "Name")
+                 first = "Name") %>%
+      gt_color_rows(columns = starts_with(input$sortPPT) & ends_with(input$sortPPT), 
+                    palette = c("red", "white", "darkgreen"),
+                    domain = PPT_data()[[input$sortPPT]])
   })
   
   output$test = renderDataTable(PPT_data())
