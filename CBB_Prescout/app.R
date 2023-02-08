@@ -418,7 +418,94 @@ server = function(input, output, session) {
                  first = "Name") %>%
       gt_color_rows(columns = starts_with(input$sortPPT) & ends_with(input$sortPPT), 
                     palette = c("red", "white", "darkgreen"),
-                    domain = PPT_data()[[input$sortPPT]])
+                    domain = PPT_data()[[input$sortPPT]]) %>%
+      tab_style(
+        style = list(
+          cell_borders(sides = "left")), locations = cells_body(
+            columns = starts_with("#") & ends_with("#") |
+              starts_with("GP") & ends_with("GP") |
+              starts_with("PG") & ends_with("PG") |
+              starts_with("PER") & ends_with("PER") |
+              starts_with("PPG") & ends_with("PPG") |
+              starts_with("2P%") & ends_with("2P%") |
+              starts_with("ApG") & ends_with("ApG") |
+              starts_with("ORB%") & ends_with("ORB%") |
+              starts_with("STL%") & ends_with("STL%"))) %>%
+      tab_style(
+        style = list(
+          cell_borders(sides = "right")), locations = cells_body(
+            columns = starts_with("Weight") & ends_with("Weight") |
+              starts_with("USG%") & ends_with("USG%") |
+              starts_with("C") & ends_with("C") |
+              starts_with("BPM") & ends_with("BPM") |
+              starts_with("FD/40") & ends_with("FD/40") |
+              starts_with("FTr") & ends_with("FTr") |
+              starts_with("TOV%") & ends_with("TOV%") |
+              starts_with("TRB%") & ends_with("TRB%") |
+              starts_with("FC/40") & ends_with("FC/40"))) %>%
+      tab_spanner(
+        label = "Player Info",
+        columns = c(starts_with("#") & ends_with("#"),
+                    starts_with("Class") & ends_with("Class"),
+                    starts_with("Pos") & ends_with("Pos"),
+                    starts_with("Height") & ends_with("Height"),
+                    starts_with("Weight") & ends_with("Weight"))) %>%
+      tab_spanner(
+        label = "Usage",
+        columns = c(starts_with("GP") & ends_with("GP"),
+                    starts_with("GS") & ends_with("GS"),
+                    starts_with("MPG") & ends_with("MPG"),
+                    starts_with("Poss%") & ends_with("Poss%"),
+                    starts_with("USG%") & ends_with("USG%"))) %>%
+      tab_spanner(
+        label = "Pos. Breakdown",
+        columns = c(starts_with("PG") & ends_with("PG"),
+                    starts_with("SG") & ends_with("SG"),
+                    starts_with("SF") & ends_with("SF"),
+                    starts_with("PF") & ends_with("PF"),
+                    starts_with("C") & ends_with("C"))) %>%
+      tab_spanner(
+        label = "Advanced",
+        columns = c(starts_with("PER") & ends_with("PER"),
+                    starts_with("OBPM") & ends_with("OBPM"),
+                    starts_with("DBPM") & ends_with("DBPM"),
+                    starts_with("BPM") & ends_with("BPM"))) %>%
+      tab_spanner(
+        label = "Scoring",
+        columns = c(starts_with("PPG") & ends_with("PPG"),
+                    starts_with("FD/40") & ends_with("FD/40"))) %>%
+      tab_spanner(
+        label = "Shooting",
+        columns = c(starts_with("2P%") & ends_with("2P%"),
+                    starts_with("3P%") & ends_with("3P%"),
+                    starts_with("3PAr") & ends_with("3PAr"),
+                    starts_with("eFG%") & ends_with("eFG%"),
+                    starts_with("TS%") & ends_with("TS%"),
+                    starts_with("FT%") & ends_with("FT%"),
+                    starts_with("FTr") & ends_with("FTr"))) %>%
+      tab_spanner(
+        label = "Playmaking",
+        columns = c(starts_with("ApG") & ends_with("ApG"),
+                    starts_with("AST:TO") & ends_with("AST:TO"),
+                    starts_with("AST%") & ends_with("AST%"),
+                    starts_with("TOV%") & ends_with("TOV%"))) %>%
+      tab_spanner(
+        label = "Rebounding",
+        columns = c(starts_with("ORB%") & ends_with("ORB%"),
+                    starts_with("DRB%") & ends_with("DRB%"),
+                    starts_with("TRB%") & ends_with("TRB%"))) %>%
+      tab_spanner(
+        label = "Defense",
+        columns = c(starts_with("STL%") & ends_with("STL%"),
+                    starts_with("BLK%") & ends_with("BLK%"),
+                    starts_with("FC/40") & ends_with("FC/40"))) %>%
+      tab_style(
+        style = cell_text(size = pct(125)),
+        locations = cells_column_labels()) %>%
+      cols_align(
+        align = "center",
+        columns = everything())
+    
   })
   
   output$test = renderDataTable(PPT_data())
