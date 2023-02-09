@@ -128,7 +128,9 @@ PPT_ColumnListVecs = list(c("Class", "Pos", "Height", "Weight"),
 PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
 #read headshot url table
-headshot_urls_db = read_xlsx("headshot_url.xlsx")
+headshot_urls_db = read_xlsx("headshot_url.xlsx") %>%
+  mutate(URL = ifelse(is.na(URL), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
+
 
 
 
@@ -275,7 +277,8 @@ server = function(input, output, session) {
                       mutate(player_join = gsub("'", "", player_join)) %>%
                       separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
                       mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
-                      select(-first_join, -last_join))
+                      select(-first_join, -last_join) %>%
+                      distinct())
   
   SR2_PPT = reactive(SRopponentTables()[[6]] %>%
                        select(Player, G, GS, MPG=MP, twoPperc="2P%", threePperc="3P%", ftperc="FT%", ApG=AST, TOV, PPG=PTS) %>%
