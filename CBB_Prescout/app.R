@@ -1,6 +1,6 @@
 library(shiny)
 library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR, paletteer)
+p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR, paletteer, toRvik)
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
@@ -81,12 +81,26 @@ SR_team_stats = SR_team_stats %>% mutate(offense_x2p_percent = (offense_fg - off
 #standardize school names
 SR_team_stats = SR_team_stats %>% mutate(school = clean_school_names(school))
 
-#pull our schedule
+#pull team groups that will be in GMC
 our_schedule = kp_team_schedule(our_team, year=year) %>% mutate(opponent = clean_school_names(opponent))
+AP_top25 = espn_mbb_rankings() %>% filter(type=="ap",
+                                          current>0) %>% .[,c(7,8,9,11,17,18,19,20)] %>% mutate(team_location = clean_school_names(team_location))
+NET_top50 = bart_tourney_sheets() %>% filter(net<=50) %>%
+  mutate(team = gsub(" N4O", "", team),
+         team = gsub(" F4O", "", team), 
+         team = gsub("St.", "State", team)) %>%
+  mutate(team = clean_school_names(team))
 
-#get graphic info for teams on our schedule, opp list, and our team
-graphic_info = cfbplotR::logo_ref %>%
+#get graphic info for each group of teams
+graphic_info_OS = cfbplotR::logo_ref %>%
   filter(school %in% our_schedule$opponent | school %in% opponentList | school == our_team) %>%
+  mutate(school = clean_school_names(school))
+graphic_info_AP = cfbplotR::logo_ref %>%
+  filter(school %in% AP_top25$team_location | school == our_team) %>%
+  mutate(school = clean_school_names(school),
+         school = ifelse(school=="UConn", "Connecticut", school))
+graphic_info_NET = cfbplotR::logo_ref %>%
+  filter(school %in% NET_top50$team | school == our_team) %>%
   mutate(school = clean_school_names(school))
 
 #change SR_team_stats school names to how they appear in graphic_info
@@ -98,7 +112,9 @@ SR_team_stats[259,1] = "Saint Mary's"
 SR_team_stats[341,1] = "VCU"
 
 #create data frame that will be used on the Graphical Metric Comparison page
-GMC = left_join(graphic_info, SR_team_stats, by= 'school')
+GMC_OS = left_join(graphic_info_OS, SR_team_stats, by= 'school')
+GMC_AP = left_join(graphic_info_AP, SR_team_stats, by= 'school')
+GMC_NET = left_join(graphic_info_NET, SR_team_stats, by= 'school')
 
 #find medians of all vars in GMC
 GMC_medians = data.frame()
@@ -150,6 +166,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                   ), #end of header fluidRow
                          sidebarLayout(
                            sidebarPanel(radioButtons("whichGraph", "Metric Comparison", MetricCompList),
+                                        radioButtons("displayedTeams", "Teams Displayed", c("Our Schedule", "AP Top 25", "NET Top 50")),
                                         checkboxInput("focus", "Focused View?")),
                            mainPanel(plotOutput("MetricComp", height = "600px"))
                            ) #end of sidebarLayout
@@ -201,9 +218,13 @@ server = function(input, output, session) {
   output$header6 = output$header5 = output$header4 = output$header3 = output$header2 = output$header = 
     renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
   
+  #decide which GMC table to use
+  GMC = reactive(if(input$displayedTeams == "Our Schedule"){GMC_OS}
+                 else if (input$displayedTeams == "AP Top 25"){GMC_AP}
+                 else if (input$displayedTeams == "NET Top 50"){GMC_NET})
   #add 'focus' aesthetics to our team and opponent
-  GMC_df = reactive(GMC %>% mutate(color2 = if_else(school == our_team | school == input$opponent, NA_character_ ,"b/w"),
-                                   alpha = if_else(school == our_team | school == input$opponent, 1, .6)))
+  GMC_df = reactive(GMC() %>% mutate(color2 = if_else(school == our_team | school == input$opponent | school == opponent_kp(), NA_character_ ,"b/w"),
+                                   alpha = if_else(school == our_team | school == input$opponent | school == opponent_kp(), 1, .6)))
    
   #Set x var and y var for axis labels
   xvar = reactive(str_split(input$whichGraph, " x ")[[1]][1])
