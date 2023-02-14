@@ -143,6 +143,8 @@ PPT_ColumnListVecs = list(c("Class", "Pos", "Height", "Weight"),
                           c("STL%", "BLK%", "FC/40"))
 PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
+OO_TrendStat_List = c("Winning Margin", "ATS Margin")
+
 #read headshot url table
 headshot_urls_db = read_xlsx("headshot_url.xlsx") %>%
   mutate(URL = ifelse(is.na(URL), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
@@ -192,7 +194,9 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header4")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         h5("Coming Soon")
+                         fluidRow(column(10, plotOutput("OppTrends")),
+                                  column(2, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin"))
+                                  ) #end of Opp Trends fluidRow 
                          ), #end of OO tabPanel
                 
                 tabPanel("Shot Charts", 
@@ -567,7 +571,25 @@ server = function(input, output, session) {
                                                      palette = c("red", "white", "darkgreen"),
                                                      domain = PPT_data()[[input$sortPPT]]))
   
-  output$test = renderText(PPT_v1_cols())
+  opp_game_stats = reactive(kp_opptracker(opponent_kp(), year) %>%
+    mutate(opponent = clean_school_names(opponent)) %>%
+    select(date, game_date, opponent, team_score, opponent_score) %>%
+    mutate(Winning_Margin = ifelse(is.na(team_score), 0, team_score - opponent_score),
+           #create a unique identifier for each game since teams can be played multiple times
+           game_code = paste(opponent, game_date)) %>%
+    select(-game_date))
+  
+  graphic_info_opp_opps = reactive(cfbplotR::logo_ref %>%
+    filter(school %in% opp_game_stats()$opponent) %>%
+    mutate(school = clean_school_names(school)) %>%
+    select(opponent = school, logo))
+  
+  Opp_Trends_df = reactive(full_join(opp_game_stats(), graphic_info_opp_opps(), by = "opponent"))
+  
+  output$OppTrends = renderPlot(Opp_Trends_df() %>%
+                                  ggplot() + geom_col(aes(x=reorder(game_code, date), y = Winning_Margin)) +
+                                  scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+                                  theme(axis.text.x = element_cfb_logo()))
   
   
   } #end of server
