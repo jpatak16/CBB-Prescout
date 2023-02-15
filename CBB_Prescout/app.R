@@ -1,6 +1,6 @@
 library(shiny)
 library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR, paletteer, toRvik)
+p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR, paletteer, toRvik, ggtext)
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
@@ -143,7 +143,8 @@ PPT_ColumnListVecs = list(c("Class", "Pos", "Height", "Weight"),
                           c("STL%", "BLK%", "FC/40"))
 PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
-OO_TrendStat_List = c("Winning Margin", "ATS Margin")
+OO_TrendStat_List = c("Winning Margin" = "Winning_Margin", 
+                      "ATS Margin" = "ATS_Margin")
 
 #read headshot url table
 headshot_urls_db = read_xlsx("headshot_url.xlsx") %>%
@@ -194,8 +195,8 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header4")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         fluidRow(column(10, plotOutput("OppTrends")),
-                                  column(2, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin"))
+                         fluidRow(column(12, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
+                                  column(12, plotOutput("OppTrends")),
                                   ) #end of Opp Trends fluidRow 
                          ), #end of OO tabPanel
                 
@@ -586,10 +587,14 @@ server = function(input, output, session) {
   
   Opp_Trends_df = reactive(full_join(opp_game_stats(), graphic_info_opp_opps(), by = "opponent"))
   
-  output$OppTrends = renderPlot(Opp_Trends_df() %>%
-                                  ggplot() + geom_col(aes(x=reorder(game_code, date), y = Winning_Margin)) +
-                                  scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
-                                  theme(axis.text.x = element_cfb_logo()))
+  Opp_Trends_df_lim = reactive(rbind(Opp_Trends_df() %>% filter(!is.na(team_score)),
+                                     Opp_Trends_df() %>% filter(is.na(team_score)) %>% .[1:3,]))
+  
+  output$OppTrends = renderPlot(ggplot(data = Opp_Trends_df_lim(), aes(x=reorder(game_code, date))) + 
+                                  geom_col(aes_string(y = input$trendingStat)) +
+                                  scale_x_discrete(labels = Opp_Trends_df_lim()$opponent) + 
+                                  theme(axis.text.x = element_cfb_logo())+
+                                  xlab("") + ylab(gsub("_", " ", input$trendingStat)))
   
   
   } #end of server
