@@ -196,7 +196,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
                          fluidRow(column(12, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
-                                  column(12, plotOutput("OppTrends")),
+                                  column(12, plotOutput("OppTrends", height = "250px")),
                                   ) #end of Opp Trends fluidRow 
                          ), #end of OO tabPanel
                 
@@ -572,29 +572,32 @@ server = function(input, output, session) {
                                                      palette = c("red", "white", "darkgreen"),
                                                      domain = PPT_data()[[input$sortPPT]]))
   
-  opp_game_stats = reactive(kp_opptracker(opponent_kp(), year) %>%
-    mutate(opponent = clean_school_names(opponent)) %>%
-    select(date, game_date, opponent, team_score, opponent_score) %>%
-    mutate(Winning_Margin = ifelse(is.na(team_score), 0, team_score - opponent_score),
-           #create a unique identifier for each game since teams can be played multiple times
-           game_code = paste(opponent, game_date)) %>%
-    select(-game_date))
+  opp_game_stats = reactive(kp_team_schedule(opponent_kp(), year) %>%
+                              select(opponent, game_date, location) %>%
+                              full_join(kp_opptracker(opponent_kp(), year), by = c("opponent", "game_date")) %>%
+                              mutate(opponent = clean_school_names(opponent)) %>%
+                              select(date, game_date, location, opponent, wl, team_score, opponent_score) %>%
+                              mutate(Winning_Margin = ifelse(is.na(team_score), 0, team_score - opponent_score),
+                                     #create a unique identifier for each game since teams can be played multiple times
+                                     game_code = paste(opponent, game_date),
+                                     #if not a true home game, consider it a road game
+                                     location = ifelse(location=="Home", "Home", "Road")) %>%
+                              select(-game_date))
   
-  graphic_info_opp_opps = reactive(cfbplotR::logo_ref %>%
-    filter(school %in% opp_game_stats()$opponent) %>%
-    mutate(school = clean_school_names(school)) %>%
-    select(opponent = school, logo))
+  Opp_Trends_df = reactive(rbind(opp_game_stats() %>% filter(!is.na(team_score)),
+                                  opp_game_stats() %>% filter(is.na(team_score)) %>% .[1:3,]))
   
-  Opp_Trends_df = reactive(full_join(opp_game_stats(), graphic_info_opp_opps(), by = "opponent"))
-  
-  Opp_Trends_df_lim = reactive(rbind(Opp_Trends_df() %>% filter(!is.na(team_score)),
-                                     Opp_Trends_df() %>% filter(is.na(team_score)) %>% .[1:3,]))
-  
-  output$OppTrends = renderPlot(ggplot(data = Opp_Trends_df_lim(), aes(x=reorder(game_code, date))) + 
-                                  geom_col(aes_string(y = input$trendingStat)) +
-                                  scale_x_discrete(labels = Opp_Trends_df_lim()$opponent) + 
-                                  theme(axis.text.x = element_cfb_logo())+
-                                  xlab("") + ylab(gsub("_", " ", input$trendingStat)))
+  output$OppTrends = renderPlot(ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+                                  geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+                                  scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+                                  xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+                                  geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
+                                  scale_fill_manual(values = c("W" = "#50c878", 
+                                                               "L" = "red")) +
+                                  scale_colour_manual(values = c("Home" = "#ffce42",
+                                                                 "Road" = "#0096FF")) +
+                                  theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                                                     legend.position = "bottom"))
   
   
   } #end of server
