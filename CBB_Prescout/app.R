@@ -145,6 +145,8 @@ PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
 OO_TrendStat_List = c("Winning Margin" = "Winning_Margin", 
                       "ATS Margin" = "ATS_Margin")
+OO_TrendSplit_List = c("OFF", "All", "Recency", "Location", "NET")
+OO_TrendIndicator_List = c("OFF", "Location", "NET", "Conference")
 
 #read headshot url table
 headshot_urls_db = read_xlsx("headshot_url.xlsx") %>%
@@ -195,8 +197,10 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header4")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         fluidRow(column(12, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
-                                  column(12, plotOutput("OppTrends", height = "250px")),
+                         fluidRow(column(3, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
+                                  column(4, radioButtons("trendSplits", "Average By Splits", OO_TrendSplit_List, inline = T)),
+                                  column(5, radioButtons("trendIndicators", "Indicators", OO_TrendIndicator_List, inline = T)),
+                                  column(12, plotOutput("OppTrends", height = "300px"))
                                   ) #end of Opp Trends fluidRow 
                          ), #end of OO tabPanel
                 
@@ -571,33 +575,113 @@ server = function(input, output, session) {
                                        gt_color_rows(columns = starts_with(input$sortPPT) & ends_with(input$sortPPT), 
                                                      palette = c("red", "white", "darkgreen"),
                                                      domain = PPT_data()[[input$sortPPT]]))
+  #find the conference of our opp
+  opp_conf = reactive(kp_program_ratings() %>%
+                        #manually change the abbreviation of certain conferences
+                        mutate(conf = ifelse(conf == "Amer", "AAC", conf)) %>%
+                        filter(team == opponent_kp()) %>%
+                        .[[1,3]])
   
+  #pull trending stats and other stats used for formtting
   opp_game_stats = reactive(kp_team_schedule(opponent_kp(), year) %>%
-                              select(opponent, game_date, location) %>%
+                              select(opponent, game_date, location, conference_game) %>%
                               full_join(kp_opptracker(opponent_kp(), year), by = c("opponent", "game_date")) %>%
                               mutate(opponent = clean_school_names(opponent)) %>%
-                              select(date, game_date, location, opponent, wl, team_score, opponent_score) %>%
+                              select(date, game_date, location, opponent, wl, team_score, opponent_score, conference_game) %>%
                               mutate(Winning_Margin = ifelse(is.na(team_score), 0, team_score - opponent_score),
                                      #create a unique identifier for each game since teams can be played multiple times
                                      game_code = paste(opponent, game_date),
                                      #if not a true home game, consider it a road game
-                                     location = ifelse(location=="Home", "Home", "Road")) %>%
-                              select(-game_date))
+                                     location = ifelse(location=="Home", "Home", "Away")) %>%
+                              select(-game_date) %>%
+                              #find NET rankings for teams our opp has played
+                              left_join(bart_tourney_sheets() %>%
+                                          mutate(team = gsub(" N4O", "", team),
+                                                 team = gsub(" F4O", "", team), 
+                                                 team = gsub("St.", "State", team),
+                                                 team = ifelse(team=="McNeese State", "McNeese St.", team)) %>%
+                                          mutate(team = clean_school_names(team)) %>%
+                                          select(opponent=team, net)) %>%
+                              mutate(net_rk = ifelse(net <= 100, 
+                                                     ifelse(net <= 50, "NET Top 50", "NET Top 100"), 
+                                                     "Other"),
+                                     conference_game = ifelse(conference_game==TRUE, opp_conf(), "OOC")))
   
+  #limit teams on the trends graph to games that have been played already and the next three games
   Opp_Trends_df = reactive(rbind(opp_game_stats() %>% filter(!is.na(team_score)),
                                   opp_game_stats() %>% filter(is.na(team_score)) %>% .[1:3,]))
   
-  output$OppTrends = renderPlot(ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
-                                  geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-                                  scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
-                                  xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
-                                  geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-                                  scale_fill_manual(values = c("W" = "#50c878", 
-                                                               "L" = "red")) +
-                                  scale_colour_manual(values = c("Home" = "#ffce42",
-                                                                 "Road" = "#0096FF")) +
-                                  theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
-                                                     legend.position = "bottom"))
+  output$OppTrends = renderPlot(
+    
+    if(input$trendSplits == "OFF"){
+      
+      if(input$trendIndicators == "OFF"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          guides(fill = guide_legend(title = NULL)) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = "horizontal")}
+      
+      else if(input$trendIndicators == "Location"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("Home" = "#ffce42",
+                                         "Away" = "#0096FF")) +
+          guides(fill = guide_legend(title = NULL, order=1),
+                 color = guide_legend(title = NULL, order=2)) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4)}
+      
+      else if(input$trendIndicators == "NET"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("NET Top 50" = "#ffce42",
+                                         "NET Top 100" = "#0096FF")) +
+          scale_size_manual(values = c("NET Top 50" = 4,
+                                       "NET Top 100" = 4,
+                                       "Other" = 0)) +
+          guides(fill = guide_legend(title = NULL, order=1),
+                 color = guide_legend(title = NULL, order=2),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18)}
+      
+      else if(input$trendIndicators == "Conference"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("#ffce42", "#ffce42"),
+                              limits = c(opp_conf())) +
+          scale_size_manual(values = c(4,0)) +
+          guides(fill = guide_legend(title = NULL, order=1),
+                 color = guide_legend(title = NULL, order=2),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18)}
+    }
+    )
   
   
   } #end of server
