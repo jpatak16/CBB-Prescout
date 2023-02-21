@@ -88,7 +88,7 @@ AP_top25 = espn_mbb_rankings() %>% filter(type=="ap",
 NET_top50 = bart_tourney_sheets() %>% filter(net<=50) %>%
   mutate(team = gsub(" N4O", "", team),
          team = gsub(" F4O", "", team), 
-         team = gsub("St.", "State", team)) %>%
+         team = gsub(" St.", " State", team)) %>%
   mutate(team = clean_school_names(team))
 
 #get graphic info for each group of teams
@@ -145,7 +145,7 @@ PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
 OO_TrendStat_List = c("Winning Margin" = "Winning_Margin", 
                       "ATS Margin" = "ATS_Margin")
-OO_TrendSplit_List = c("OFF", "All", "Recency", "Location", "NET")
+OO_TrendSplit_List = c("OFF", "All", "Recency", "Location", "Result", "NET", "Conference")
 OO_TrendIndicator_List = c("OFF", "Location", "NET", "Conference")
 
 #read headshot url table
@@ -197,10 +197,10 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header4")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         fluidRow(column(3, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
-                                  column(4, radioButtons("trendSplits", "Average By Splits", OO_TrendSplit_List, inline = T)),
-                                  column(5, radioButtons("trendIndicators", "Indicators", OO_TrendIndicator_List, inline = T)),
-                                  column(12, plotOutput("OppTrends", height = "300px"))
+                         fluidRow(column(2, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
+                                  column(6, radioButtons("trendSplits", "Average By Splits", OO_TrendSplit_List, inline = T)),
+                                  column(4, radioButtons("trendIndicators", "Indicators", OO_TrendIndicator_List, inline = T)),
+                                  column(12, plotOutput("OppTrends", height = "350px"))
                                   ) #end of Opp Trends fluidRow 
                          ), #end of OO tabPanel
                 
@@ -598,7 +598,7 @@ server = function(input, output, session) {
                               left_join(bart_tourney_sheets() %>%
                                           mutate(team = gsub(" N4O", "", team),
                                                  team = gsub(" F4O", "", team), 
-                                                 team = gsub("St.", "State", team),
+                                                 team = gsub(" St.", " State", team),
                                                  team = ifelse(team=="McNeese State", "McNeese St.", team)) %>%
                                           mutate(team = clean_school_names(team)) %>%
                                           select(opponent=team, net)) %>%
@@ -606,6 +606,45 @@ server = function(input, output, session) {
                                                      ifelse(net <= 50, "NET Top 50", "NET Top 100"), 
                                                      "Other"),
                                      conference_game = ifelse(conference_game==TRUE, opp_conf(), "OOC")))
+  
+  #create separate data frames to split the data based on the input so that we can calculate mean in each split
+  opp_game_stats_recency5 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
+                                       .[(nrow(opp_game_stats() %>% filter(!is.na(team_score)))-4):nrow(opp_game_stats() %>% filter(!is.na(team_score))),] %>%
+                                       mutate(recency5 = "Last 5 Games") %>%
+                                       select(game_code, recency5, input$trendingStat))
+  
+  opp_game_stats_recency10 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
+                                        .[(nrow(opp_game_stats() %>% filter(!is.na(team_score)))-9):nrow(opp_game_stats() %>% filter(!is.na(team_score))),] %>%
+                                        mutate(recency10 = "Last 10 Games") %>%
+                                        select(game_code, recency10, input$trendingStat))
+  
+  opp_game_stats_home = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
+                                   filter(location == "Home") %>%
+                                   select(game_code, location, input$trendingStat))
+  
+  opp_game_stats_away = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
+                                   filter(location == "Away") %>%
+                                   select(game_code, location, input$trendingStat))
+  
+  opp_game_stats_net50 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
+                                    filter(net <= 50) %>%
+                                    select(game_code, net, input$trendingStat))
+  
+  opp_game_stats_net100 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
+                                    filter(net <= 100) %>%
+                                    select(game_code, net, input$trendingStat))
+  
+  opp_game_stats_wins = reactive(opp_game_stats() %>%
+                                     filter(wl == "W") %>%
+                                     select(game_code, wl, input$trendingStat))
+  
+  opp_game_stats_losses = reactive(opp_game_stats() %>%
+                                   filter(wl == "L") %>%
+                                   select(game_code, wl, input$trendingStat))
+  
+  opp_game_stats_conf = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
+                                     filter(conference_game == opp_conf()) %>%
+                                     select(game_code, conference_game, input$trendingStat))
   
   #limit teams on the trends graph to games that have been played already and the next three games
   Opp_Trends_df = reactive(rbind(opp_game_stats() %>% filter(!is.na(team_score)),
@@ -672,7 +711,7 @@ server = function(input, output, session) {
                                        "L" = "red")) +
           scale_colour_manual(values = c("#ffce42", "#ffce42"),
                               limits = c(opp_conf())) +
-          scale_size_manual(values = c(4,0)) +
+          scale_size_manual(values = c(4), limits = c(opp_conf())) +
           guides(fill = guide_legend(title = NULL, order=1),
                  color = guide_legend(title = NULL, order=2),
                  size = FALSE) +
@@ -681,7 +720,674 @@ server = function(input, output, session) {
                              legend.direction = 'horizontal') +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18)}
     }
+    
+    else if(input$trendSplits == "All"){
+      
+      if(input$trendIndicators == "OFF"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_linetype_manual(paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1)) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = "horizontal") +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1)}
+      
+      else if(input$trendIndicators == "Location"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("Home" = "#ffce42",
+                                         "Away" = "#0096FF")) +
+          scale_linetype_manual(paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1)) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4)}
+      
+      else if(input$trendIndicators == "NET"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("NET Top 50" = "#ffce42",
+                                         "NET Top 100" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash")) +
+          scale_size_manual(values = c("NET Top 50" = 4,
+                                       "NET Top 100" = 4,
+                                       "Other" = 0)) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18)}
+      
+      else if(input$trendIndicators == "Conference"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("#ffce42", "#ffce42"),
+                              limits = c(opp_conf())) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash")) +
+          scale_size_manual(values = c(4), limits = c(opp_conf())) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18)}
+    }
+    
+    else if(input$trendSplits == "Recency"){
+      
+      if(input$trendIndicators == "OFF"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash", 
+                                           "Last 5 Games" = "dashed",
+                                           "Last 10 Games" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = "horizontal") +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+                         linetype="Last 5 Games"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+                         linetype="Last 10 Games"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "Location"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("Home" = "#ffce42",
+                                         "Away" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Last 5 Games" = "dashed",
+                                           "Last 10 Games" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+                         linetype="Last 5 Games"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+                         linetype="Last 10 Games"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "NET"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("NET Top 50" = "#ffce42",
+                                         "NET Top 100" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Last 5 Games" = "dashed",
+                                           "Last 10 Games" = "dashed")) +
+          scale_size_manual(values = c("NET Top 50" = 4,
+                                       "NET Top 100" = 4,
+                                       "Other" = 0)) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+                         linetype="Last 5 Games"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+                         linetype="Last 10 Games"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "Conference"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("#ffce42", "#ffce42"),
+                              limits = c(opp_conf())) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Last 5 Games" = "dashed",
+                                           "Last 10 Games" = "dashed")) +
+          scale_size_manual(values = c(4), limits = c(opp_conf())) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+                         linetype="Last 5 Games"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+                         linetype="Last 10 Games"), color = "#0096FF" , size = 1)}
+    }
+    
+    else if(input$trendSplits == "Location"){
+      
+      if(input$trendIndicators == "OFF"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash", 
+                                           "Home" = "dashed",
+                                           "Away" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = "horizontal") +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+                         linetype="Home"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+                         linetype="Away"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "Location"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("Home" = "#ffce42",
+                                         "Away" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Home" = "dashed",
+                                           "Away" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+                         linetype="Home"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+                         linetype="Away"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "NET"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("NET Top 50" = "#ffce42",
+                                         "NET Top 100" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Home" = "dashed",
+                                           "Away" = "dashed")) +
+          scale_size_manual(values = c("NET Top 50" = 4,
+                                       "NET Top 100" = 4,
+                                       "Other" = 0)) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+                         linetype="Home"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+                         linetype="Away"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "Conference"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("#ffce42", "#ffce42"),
+                              limits = c(opp_conf())) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Home" = "dashed",
+                                           "Away" = "dashed")) +
+          scale_size_manual(values = c(4), limits = c(opp_conf())) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+                         linetype="Home"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+                         linetype="Away"), color = "#0096FF" , size = 1)}
+    }
+    
+    else if(input$trendSplits == "Result"){
+      
+      if(input$trendIndicators == "OFF"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash", 
+                                           "Wins" = "dashed",
+                                           "Losses" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#50c878", "red")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = "horizontal") +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+                         linetype="Wins"), color = "#50c878" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+                         linetype="Losses"), color = "red" , size = 1)}
+      
+      else if(input$trendIndicators == "Location"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("Home" = "#ffce42",
+                                         "Away" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Wins" = "dashed",
+                                           "Losses" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#50c878", "red")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+                         linetype="Wins"), color = "#50c878" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+                         linetype="Losses"), color = "red" , size = 1)}
+      
+      else if(input$trendIndicators == "NET"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("NET Top 50" = "#ffce42",
+                                         "NET Top 100" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Wins" = "dashed",
+                                           "Losses" = "dashed")) +
+          scale_size_manual(values = c("NET Top 50" = 4,
+                                       "NET Top 100" = 4,
+                                       "Other" = 0)) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#50c878", "red"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+                         linetype="Wins"), color = "#50c878" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+                         linetype="Losses"), color = "red" , size = 1)}
+      
+      else if(input$trendIndicators == "Conference"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("#ffce42", "#ffce42"),
+                              limits = c(opp_conf())) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Wins" = "dashed",
+                                           "Losses" = "dashed")) +
+          scale_size_manual(values = c(4), limits = c(opp_conf())) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#50c878", "red"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+                         linetype="Wins"), color = "#50c878" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+                         linetype="Losses"), color = "red" , size = 1)}
+    }
+    
+    else if(input$trendSplits == "NET"){
+      
+      if(input$trendIndicators == "OFF"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash", 
+                                           "NET Top 50" = "dashed",
+                                           "NET Top 100" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = "horizontal") +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+                         linetype="NET Top 50"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+                         linetype="NET Top 100"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "Location"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("Home" = "#ffce42",
+                                         "Away" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "NET Top 50" = "dashed",
+                                           "NET Top 100" = "dashed")) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+                         linetype="NET Top 50"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+                         linetype="NET Top 100"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "NET"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("NET Top 50" = "#ffce42",
+                                         "NET Top 100" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "NET Top 50" = "dashed",
+                                           "NET Top 100" = "dashed")) +
+          scale_size_manual(values = c("NET Top 50" = 4,
+                                       "NET Top 100" = 4,
+                                       "Other" = 0)) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+                         linetype="NET Top 50"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+                         linetype="NET Top 100"), color = "#0096FF" , size = 1)}
+      
+      else if(input$trendIndicators == "Conference"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("#ffce42", "#ffce42"),
+                              limits = c(opp_conf())) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "NET Top 50" = "dashed",
+                                           "NET Top 100" = "dashed")) +
+          scale_size_manual(values = c(4), limits = c(opp_conf())) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42", "#0096FF"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+                         linetype="NET Top 50"), color = "#ffce42" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+                         linetype="NET Top 100"), color = "#0096FF" , size = 1)}
+    }
+    
+    else if(input$trendSplits == "Conference"){
+      
+      if(input$trendIndicators == "OFF"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash", 
+                                           "Conference Games" = "dashed"),
+                                labels = c("All Games", paste0(opp_conf(), " Games"))) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = "horizontal") +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+                         linetype="Conference Games"), color = "#ffce42" , size = 1)}
+      
+      else if(input$trendIndicators == "Location"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("Home" = "#ffce42",
+                                         "Away" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Conference Games" = "dashed"),
+                                labels = c("All Games", paste0(opp_conf(), " Games"))) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42")))) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+                         linetype="Conference Games"), color = "#ffce42" , size = 1)}
+      
+      else if(input$trendIndicators == "NET"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("NET Top 50" = "#ffce42",
+                                         "NET Top 100" = "#0096FF")) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Conference Games" = "dashed"),
+                                labels = c("All Games", paste0(opp_conf(), " Games")))+
+          scale_size_manual(values = c("NET Top 50" = 4,
+                                       "NET Top 100" = 4,
+                                       "Other" = 0)) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+                         linetype="Conference Games"), color = "#ffce42" , size = 1)}
+      
+      else if(input$trendIndicators == "Conference"){
+        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
+          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          scale_fill_manual(values = c("W" = "#50c878", 
+                                       "L" = "red")) +
+          scale_colour_manual(values = c("#ffce42", "#ffce42"),
+                              limits = c(opp_conf())) +
+          scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
+                                values = c("All Games" = "longdash",
+                                           "Conference Games" = "dashed"),
+                                labels = c("All Games", paste0(opp_conf(), " Games"))) +
+          scale_size_manual(values = c(4), limits = c(opp_conf())) +
+          guides(fill = guide_legend(title = NULL, order=2),
+                 color = guide_legend(title = NULL, order=3),
+                 linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
+                                         override.aes = list(colour=c("black", "#ffce42"))),
+                 size = FALSE) +
+          theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
+                             legend.position = "bottom",
+                             legend.direction = 'horizontal') +
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+                         linetype="All Games"), color = "black" , size = 1) +
+          geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+                         linetype="Conference Games"), color = "#ffce42" , size = 1)}
+    }
     )
+  
   
   
   } #end of server
