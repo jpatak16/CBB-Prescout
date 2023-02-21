@@ -102,19 +102,49 @@ graphic_info_AP = cfbplotR::logo_ref %>%
 graphic_info_NET = cfbplotR::logo_ref %>%
   filter(school %in% NET_top50$team | school == our_team) %>%
   mutate(school = clean_school_names(school))
+#graphic_info_test = cfbplotR::logo_ref %>%
+  #mutate(school = clean_school_names(school))
 
 #change SR_team_stats school names to how they appear in graphic_info
-#these are just the ones I've found to be different so far; they must be manually changed
-SR_team_stats[30,1] = 'BYU'
-SR_team_stats[285,1] = 'SMU'
-SR_team_stats[281,1] = 'USC'
-SR_team_stats[259,1] = "Saint Mary's"
-SR_team_stats[341,1] = "VCU"
+#commented out test code can be used to find which schools are not currently matching. 
+#There are 3 schools that dont have a match on both sides right now
+SR_team_stats = SR_team_stats %>% 
+  mutate(school= ifelse(school=="Albany (NY)", "Albany", school),
+         school= ifelse(school=="Bowling Green State", "Bowling Green", school),
+         school= ifelse(school=="Brigham Young", "BYU", school),
+         school= ifelse(school=="Cal State Bakersfield", "CSU Bakersfield", school),
+         school= ifelse(school=="Cal State Fullerton", "CSU Fullerton", school),
+         school= ifelse(school=="Cal State Northridge", "CSU Northridge", school),
+         school= ifelse(school=="Central Connecticut State", "Central Connecticut", school),
+         school= ifelse(school=="Central Florida", "UCF", school),
+         school= ifelse(school=="College of Charleston", "Charleston", school),
+         school= ifelse(school=="Houston Christian", "Houston Baptist", school),
+         school= ifelse(school=="Illinois-Chicago", "UIC", school),
+         school= ifelse(school=="Louisiana State", "LSU", school),
+         school= ifelse(school=="Loyola (IL)", "Loyola Chicago", school),
+         school= ifelse(school=="Maryland-Baltimore County", "UMBC", school),
+         school= ifelse(school=="Massachusetts-Lowell", "UMass Lowell", school),
+         school= ifelse(school=="McNeese State", "McNeese", school),
+         school= ifelse(school=="Nevada-Las Vegas", "UNLV", school),
+         school= ifelse(school=="Nicholls State", "Nicholls", school),
+         school= ifelse(school=="Purdue-Fort Wayne", "Purdue Fort Wayne", school),
+         school= ifelse(school=="Saint Francis (PA)", "St. Francis (PA)", school),
+         school= ifelse(school=="Saint Mary's (CA)", "Saint Mary's", school),
+         school= ifelse(school=="Southern California", "USC", school),
+         school= ifelse(school=="Southern Methodist", "SMU", school),
+         school= ifelse(school=="St. Francis (NY)", "St. Francis (BKN)", school),
+         school= ifelse(school=="Tennessee-Martin", "UT Martin", school),
+         school= ifelse(school=="Texas A&M-Corpus Christi", "Texas A&M-CC", school),
+         school= ifelse(school=="Texas-Rio Grande Valley", "UT Rio Grande Valley", school),
+         school= ifelse(school=="Utah Tech", "Dixie State", school),
+         school= ifelse(school=="Virginia Commonwealth", "VCU", school)
+         )
 
 #create data frame that will be used on the Graphical Metric Comparison page
 GMC_OS = left_join(graphic_info_OS, SR_team_stats, by= 'school')
 GMC_AP = left_join(graphic_info_AP, SR_team_stats, by= 'school')
 GMC_NET = left_join(graphic_info_NET, SR_team_stats, by= 'school')
+#GMC_test = right_join(graphic_info_test, SR_team_stats, by = "school")
 
 #find medians of all vars in GMC
 GMC_medians = data.frame()
