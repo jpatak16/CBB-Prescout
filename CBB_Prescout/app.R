@@ -137,8 +137,7 @@ SR_team_stats = SR_team_stats %>%
          school= ifelse(school=="Texas A&M-Corpus Christi", "Texas A&M-CC", school),
          school= ifelse(school=="Texas-Rio Grande Valley", "UT Rio Grande Valley", school),
          school= ifelse(school=="Utah Tech", "Dixie State", school),
-         school= ifelse(school=="Virginia Commonwealth", "VCU", school)
-         )
+         school= ifelse(school=="Virginia Commonwealth", "VCU", school))
 
 #create data frame that will be used on the Graphical Metric Comparison page
 GMC_OS = left_join(graphic_info_OS, SR_team_stats, by= 'school')
@@ -623,7 +622,6 @@ server = function(input, output, session) {
                                      game_code = paste(opponent, game_date),
                                      #if not a true home game, consider it a road game
                                      location = ifelse(location=="Home", "Home", "Away")) %>%
-                              select(-game_date) %>%
                               #find NET rankings for teams our opp has played
                               left_join(bart_tourney_sheets() %>%
                                           mutate(team = gsub(" N4O", "", team),
@@ -680,12 +678,28 @@ server = function(input, output, session) {
   Opp_Trends_df = reactive(rbind(opp_game_stats() %>% filter(!is.na(team_score)),
                                   opp_game_stats() %>% filter(is.na(team_score)) %>% .[1:3,]))
   
+  #create columns so we can access date info and order of games for easier shading
+  Opp_Trends_df_dates = reactive(Opp_Trends_df() %>%
+    mutate(month = substr(game_date, 5, 6),
+           day = substr(game_date, 7, 8),
+           game_num = seq(1, nrow(Opp_Trends_df()))))
+  
+  #find max and min games of months that need shading
+  dec_min = reactive(Opp_Trends_df_dates() %>% filter(month==12) %>% arrange(day) %>% .[1, "game_num"] %>% as.numeric() %>% sum(-.5))
+  dec_max = reactive(Opp_Trends_df_dates() %>% filter(month==12) %>% arrange(desc(day)) %>% .[1,"game_num"] %>% as.numeric() %>% sum(.5))
+  feb_min = reactive(Opp_Trends_df_dates() %>% filter(month=="02") %>% arrange(day) %>% .[1,"game_num"] %>% as.numeric() %>% sum(-.5))
+  feb_max = reactive(Opp_Trends_df_dates() %>% filter(month=="02") %>% arrange(desc(day)) %>% .[1,"game_num"] %>% as.numeric() %>% sum(.5))
+  
   output$OppTrends = renderPlot(
     
     if(input$trendSplits == "OFF"){
       
       if(input$trendIndicators == "OFF"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -698,6 +712,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Location"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -714,6 +732,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "NET"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -734,6 +756,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Conference"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -755,6 +781,10 @@ server = function(input, output, session) {
       
       if(input$trendIndicators == "OFF"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -772,6 +802,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Location"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -793,6 +827,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "NET"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -818,6 +856,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Conference"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -844,6 +886,10 @@ server = function(input, output, session) {
       
       if(input$trendIndicators == "OFF"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -868,6 +914,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Location"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -896,6 +946,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "NET"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -928,6 +982,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Conference"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -961,6 +1019,10 @@ server = function(input, output, session) {
       
       if(input$trendIndicators == "OFF"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -985,6 +1047,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Location"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1013,6 +1079,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "NET"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1045,6 +1115,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Conference"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1078,6 +1152,10 @@ server = function(input, output, session) {
       
       if(input$trendIndicators == "OFF"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1102,6 +1180,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Location"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1130,6 +1212,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "NET"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1162,6 +1248,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Conference"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1195,6 +1285,10 @@ server = function(input, output, session) {
       
       if(input$trendIndicators == "OFF"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1219,6 +1313,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Location"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1247,6 +1345,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "NET"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1279,6 +1381,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Conference"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1312,6 +1418,10 @@ server = function(input, output, session) {
       
       if(input$trendIndicators == "OFF"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1334,6 +1444,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Location"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1360,6 +1474,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "NET"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1390,6 +1508,10 @@ server = function(input, output, session) {
       
       else if(input$trendIndicators == "Conference"){
         ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+          annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
+          annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
+                   fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
@@ -1417,8 +1539,7 @@ server = function(input, output, session) {
                          linetype="Conference Games"), color = "#ffce42" , size = 1)}
     }
     )
-  
-  
+
   
   } #end of server
 
