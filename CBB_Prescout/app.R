@@ -611,7 +611,27 @@ server = function(input, output, session) {
                         filter(team == opponent_kp()) %>%
                         .[[1,3]])
   
-  #pull trending stats and other stats used for formtting
+  opp_id = reactive(espn_mbb_teams() %>%
+                      filter(toupper(team) == toupper(input$opponent)) %>%
+                      select(team_id) %>%
+                      .[[1,1]])
+  
+  opp_spreads = reactive({
+    df <- load_mbb_schedule() %>% 
+      filter(home_id == "248" | away_id == "248",
+             status_type_state == "post") %>%
+      select(game_id = id, date, home_short_display_name, away_short_display_name, home_id, away_id) %>%
+      arrange(date) %>%
+      mutate(spread = NA)
+                      
+    for(r in 1:nrow(df)) {
+      df[r,"spread"] = espn_mbb_betting(df$game_id[r])[[1]] %>% 
+        filter(provider_name == "consensus") %>% .[[1,3]]}
+    df
+    })
+  
+  
+  #pull trending stats and other stats used for formatting
   opp_game_stats = reactive(kp_team_schedule(opponent_kp(), year) %>%
                               select(opponent, game_date, location, conference_game) %>%
                               full_join(kp_opptracker(opponent_kp(), year), by = c("opponent", "game_date")) %>%
@@ -676,7 +696,8 @@ server = function(input, output, session) {
   
   #limit teams on the trends graph to games that have been played already and the next three games
   Opp_Trends_df = reactive(rbind(opp_game_stats() %>% filter(!is.na(team_score)),
-                                  opp_game_stats() %>% filter(is.na(team_score)) %>% .[1:3,]))
+                                  opp_game_stats() %>% filter(is.na(team_score)) %>% .[1:3,]) %>%
+                             filter(!is.na(opponent)))
   
   #create columns so we can access date info and order of games for easier shading
   Opp_Trends_df_dates = reactive(Opp_Trends_df() %>%
