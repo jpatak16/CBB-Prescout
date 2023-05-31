@@ -1,159 +1,17 @@
 library(shiny)
 library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, readxl, hoopR, paletteer, toRvik, ggtext)
+p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, hoopR, paletteer, toRvik, ggtext)
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
 opponentList = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
-opponentSRurl_db = read_xlsx("opp_url.xlsx")
 year=2023
 
-#####basic offense table webscrape
-basic_offense_url = "https://www.sports-reference.com/cbb/seasons/2023-school-stats.html"
-
-basic_offense = read_html(basic_offense_url) %>%
-  html_table(fill = TRUE) %>%
-  .[[1]] %>% as.data.frame() %>%
-  .[,-c(9,12,15,18,21)] %>% #remove empty columns
-  row_to_names(row_number = 1, remove_row = T) %>% clean_names() %>% #use row 1 as col names
-  filter(!g=='G') %>% filter(!g=="Overall") %>% #filter out 'header' rows scattered in the data frame
-  mutate(school = ifelse(endsWith(school, "NCAA"), substr(school, 1, nchar(school)-5), school)) %>% #removes tag given on SR for making the NCAAT
-  .[,-c(1, 9:16)] # removes columns for conference, home, and away team record
-#add offense label to col names
-colnames(basic_offense)= c(colnames(basic_offense[,1:7]), paste("offense_", colnames(basic_offense[,8:24]), sep = ""))
-
-
-#####basic defense table webscrape
-basic_defense_url = "https://www.sports-reference.com/cbb/seasons/2023-opponent-stats.html"
-
-basic_defense = read_html(basic_defense_url) %>%
-  html_table(fill = TRUE) %>%
-  .[[1]] %>% as.data.frame() %>%
-  .[,-c(9,12,15,18,21)] %>% #remove empty columns
-  row_to_names(row_number = 1, remove_row = T) %>% clean_names() %>% #use row 1 as col names
-  filter(!g=='G') %>% filter(!g=="Overall") %>% #filter out 'header' rows scattered in the data frame
-  mutate(school = ifelse(endsWith(school, "NCAA"), substr(school, 1, nchar(school)-5), school)) %>% #removes tag given on SR for making the NCAAT
-  .[,-c(1, 9:16)] #removes columns for conference, home, and away team records
-#add defense label to col names
-colnames(basic_defense)= c(colnames(basic_defense[,1:7]), paste("defense_", colnames(basic_defense[,8:24]), sep = ""))
-
-
-#####advanced offense table webscrape
-advanced_offense_url = "https://www.sports-reference.com/cbb/seasons/2023-advanced-school-stats.html"
-
-advanced_offense = read_html(advanced_offense_url) %>%
-  html_table(fill = TRUE) %>%
-  .[[1]] %>% as.data.frame() %>%
-  .[,-c(9,12,15,18,21)] %>% #remove empty columns
-  row_to_names(row_number = 1, remove_row = T) %>% clean_names() %>% #use row 1 as col names
-  filter(!g=='G') %>% filter(!g=="Overall") %>% #filter out 'header' rows scattered in the data frame
-  mutate(school = ifelse(endsWith(school, "NCAA"), substr(school, 1, nchar(school)-5), school)) %>% #removes tag given on SR for making the NCAAT
-  .[,-c(1, 9:16)] #removes columns for conference, home, and away team records
-colnames(advanced_offense)= c(colnames(advanced_offense[,1:7]), paste("offense_", colnames(advanced_offense[,8:20]), sep = ""))
-
-#####advanced defense table webscrape
-advanced_defense_url = "https://www.sports-reference.com/cbb/seasons/2023-advanced-opponent-stats.html"
-
-advanced_defense = read_html(advanced_defense_url) %>%
-  html_table(fill = TRUE) %>%
-  .[[1]] %>% as.data.frame() %>%
-  .[,-c(9,12,15,18,21)] %>% #remove empty columns
-  row_to_names(row_number = 1, remove_row = T) %>% clean_names() %>% #use row 1 as col names
-  filter(!g=='G') %>% filter(!g=="Overall") %>% #filter out 'header' rows scattered in the data frame
-  mutate(school = ifelse(endsWith(school, "NCAA"), substr(school, 1, nchar(school)-5), school)) %>%
-  .[,-c(1, 9:16)] #removes columns for conference, home, and away team records
-colnames(advanced_defense)= c(colnames(advanced_defense[,1:7]), paste("defense_", colnames(advanced_defense[,8:20]), sep = ""))
-
-#put all tables into one 
-SR_team_stats = left_join(basic_offense, basic_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
-SR_team_stats = left_join(SR_team_stats, advanced_offense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
-SR_team_stats = left_join(SR_team_stats, advanced_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
-
-rm(advanced_offense, advanced_defense, basic_offense, basic_defense, advanced_offense_url, advanced_defense_url, basic_offense_url, basic_defense_url)
-
-#convert stats into usable numeric stats
-for(c in 2:67){SR_team_stats[,c] = SR_team_stats[,c] %>% as.numeric()}; rm(c)
-
-#make all stats we want using other stats
-SR_team_stats = SR_team_stats %>% mutate(offense_x2p_percent = (offense_fg - offense_x3p)/(offense_fga - offense_x3pa),
-                                         offense_drb_percent = 100 - defense_orb_percent)
-
-#standardize school names
-SR_team_stats = SR_team_stats %>% mutate(school = clean_school_names(school))
-
-#pull team groups that will be in GMC
-our_schedule = kp_team_schedule(our_team, year=year) %>% mutate(opponent = clean_school_names(opponent))
-AP_top25 = espn_mbb_rankings() %>% filter(type=="usa",
-                                          current>0) %>% .[,c(7,8,9,11,17,18,19,20)] %>% mutate(team_location = clean_school_names(team_location))
-
-NET_top50 = bart_tourney_sheets() %>% filter(net<=50) %>%
-  mutate(team = gsub(" N4O", "", team),
-         team = gsub(" F4O", "", team), 
-         team = gsub(" St.", " State", team)) %>%
-  mutate(team = clean_school_names(team))
-
-#get graphic info for each group of teams
-graphic_info_OS = cfbplotR::logo_ref %>%
-  filter(school %in% our_schedule$opponent | school %in% opponentList | school == our_team) %>%
-  mutate(school = clean_school_names(school))
-graphic_info_AP = cfbplotR::logo_ref %>%
-  filter(school %in% AP_top25$team_location | school == our_team) %>%
-  mutate(school = clean_school_names(school),
-         school = ifelse(school=="UConn", "Connecticut", school))
-graphic_info_NET = cfbplotR::logo_ref %>%
-  filter(school %in% NET_top50$team | school == our_team) %>%
-  mutate(school = clean_school_names(school))
-graphic_info_test = cfbplotR::logo_ref %>%
-  mutate(school = clean_school_names(school))
-
-#change SR_team_stats school names to how they appear in graphic_info
-#commented out test code can be used to find which schools are not currently matching. 
-#There are 3 schools that dont have a match on both sides right now
-SR_team_stats = SR_team_stats %>% 
-  mutate(school= ifelse(school=="Albany (NY)", "Albany", school),
-         school= ifelse(school=="Bowling Green State", "Bowling Green", school),
-         school= ifelse(school=="Brigham Young", "BYU", school),
-         school= ifelse(school=="Cal State Bakersfield", "CSU Bakersfield", school),
-         school= ifelse(school=="Cal State Fullerton", "CSU Fullerton", school),
-         school= ifelse(school=="Cal State Northridge", "CSU Northridge", school),
-         school= ifelse(school=="Central Connecticut State", "Central Connecticut", school),
-         school= ifelse(school=="Central Florida", "UCF", school),
-         school= ifelse(school=="College of Charleston", "Charleston", school),
-         school= ifelse(school=="Houston Christian", "Houston Baptist", school),
-         school= ifelse(school=="Illinois-Chicago", "UIC", school),
-         school= ifelse(school=="Louisiana State", "LSU", school),
-         school= ifelse(school=="Loyola (IL)", "Loyola Chicago", school),
-         school= ifelse(school=="Maryland-Baltimore County", "UMBC", school),
-         school= ifelse(school=="Massachusetts-Lowell", "UMass Lowell", school),
-         school= ifelse(school=="McNeese State", "McNeese", school),
-         school= ifelse(school=="Nevada-Las Vegas", "UNLV", school),
-         school= ifelse(school=="Nicholls State", "Nicholls", school),
-         school= ifelse(school=="Purdue-Fort Wayne", "Purdue Fort Wayne", school),
-         school= ifelse(school=="Saint Francis (PA)", "St. Francis (PA)", school),
-         school= ifelse(school=="Saint Mary's (CA)", "Saint Mary's", school),
-         school= ifelse(school=="Southern California", "USC", school),
-         school= ifelse(school=="Southern Methodist", "SMU", school),
-         school= ifelse(school=="St. Francis (NY)", "St. Francis (BKN)", school),
-         school= ifelse(school=="Tennessee-Martin", "UT Martin", school),
-         school= ifelse(school=="Texas A&M-Corpus Christi", "Texas A&M-CC", school),
-         school= ifelse(school=="Texas-Rio Grande Valley", "UT Rio Grande Valley", school),
-         school= ifelse(school=="Utah Tech", "Dixie State", school),
-         school= ifelse(school=="Virginia Commonwealth", "VCU", school))
-
-#create data frame that will be used on the Graphical Metric Comparison page
-GMC_OS = left_join(graphic_info_OS, SR_team_stats, by= 'school')
-GMC_AP = left_join(graphic_info_AP, SR_team_stats, by= 'school')
-GMC_NET = left_join(graphic_info_NET, SR_team_stats, by= 'school')
-#GMC_test = right_join(graphic_info_test, SR_team_stats, by = "school")
-
-#find medians of all vars in GMC
-GMC_medians = data.frame()
-for(c in 2:ncol(SR_team_stats)){
-  a = pull(SR_team_stats, var = c)
-  GMC_medians[1,c-1] = median(a)
-}
-colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
-rm(a, c)
+#load in data
+GMC_AP = read.csv("data/GMC_AP.csv")
+GMC_OS = read.csv("data/GMC_OS.csv")
+GMC_NET = read.csv("data/GMC_NET.csv")
+GMC_medians = read.csv("data/GMC_medians.csv")
 
 #the list of options for our metric comparison plots
 MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
