@@ -83,8 +83,9 @@ SR_team_stats = SR_team_stats %>% mutate(school = clean_school_names(school))
 
 #pull team groups that will be in GMC
 our_schedule = kp_team_schedule(our_team, year=year) %>% mutate(opponent = clean_school_names(opponent))
-AP_top25 = espn_mbb_rankings() %>% filter(type=="ap",
+AP_top25 = espn_mbb_rankings() %>% filter(type=="usa",
                                           current>0) %>% .[,c(7,8,9,11,17,18,19,20)] %>% mutate(team_location = clean_school_names(team_location))
+
 NET_top50 = bart_tourney_sheets() %>% filter(net<=50) %>%
   mutate(team = gsub(" N4O", "", team),
          team = gsub(" F4O", "", team), 
@@ -102,8 +103,8 @@ graphic_info_AP = cfbplotR::logo_ref %>%
 graphic_info_NET = cfbplotR::logo_ref %>%
   filter(school %in% NET_top50$team | school == our_team) %>%
   mutate(school = clean_school_names(school))
-#graphic_info_test = cfbplotR::logo_ref %>%
-  #mutate(school = clean_school_names(school))
+graphic_info_test = cfbplotR::logo_ref %>%
+  mutate(school = clean_school_names(school))
 
 #change SR_team_stats school names to how they appear in graphic_info
 #commented out test code can be used to find which schools are not currently matching. 
@@ -173,7 +174,23 @@ PPT_ColumnListVecs = list(c("Class", "Pos", "Height", "Weight"),
 PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
 OO_TrendStat_List = c("Winning Margin" = "Winning_Margin", 
-                      "ATS Margin" = "ATS_Margin")
+                      "ATS Margin" = "ATS_Margin",
+                      "Pace" = "Pace",
+                      "Offensive Efficency" = "Offensive_Efficency", 
+                      "Defensive Efficency" = "Defensive_Efficency", 
+                      "Points Scored" = "Points_Scored", 
+                      "Points Allowed" = "Points_Allowed", 
+                      "Offensive 3PAr" = "Offensive_3PAr", 
+                      "Offensive 3P%" = "Offensive_3Ppct", 
+                      "Offensive TO%" = "Offensive_TOpct", 
+                      "Offensive OREB%" = "Offensive_OREBpct", 
+                      "Offensive FTr" = "Offensive_FTr", 
+                      "Defensive 3PAr" = "Defensive_3PAr", 
+                      "Defensive 3P%" = "Defensive_3Ppct", 
+                      "Defensive TO%" = "Defensive_TOpct", 
+                      "Defensive OREB%" = "Defensive_OREBpct", 
+                      "Defensive FTr" = "Defensive_FTr")
+
 OO_TrendSplit_List = c("OFF", "All", "Recency", "Location", "Result", "NET", "Conference")
 OO_TrendIndicator_List = c("OFF", "Location", "NET", "Conference")
 
@@ -244,7 +261,8 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header5")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         h5("Coming Soon")
+                         h5("Coming Soon"),
+                         dataTableOutput("test")
                          ), #end of SC tabPanel
                 
                 tabPanel("Lineups", 
@@ -649,6 +667,12 @@ server = function(input, output, session) {
       
     })
   
+  #find other stats used in OO Trend table and format column names to match select input
+  opp_gp_stats = reactive(kp_gameplan(opponent_kp(), year)[[1]] %>%
+                            select(game_date, Pace=pace, Offensive_Efficency=off_eff, Defensive_Efficency=def_eff, Points_Scored=team_score, Points_Allowed=opponent_score, 
+                                   Offensive_3PAr=off_fg_3a_pct, 'Offensive_3Ppct'=off_fg_3_pct, 'Offensive_TOpct'=off_to_pct, 'Offensive_OREBpct'=off_or_pct, Offensive_FTr=off_ftr, 
+                                   Defensive_3PAr=def_fg_3a_pct, 'Defensive_3Ppct'=def_fg_3_pct, 'Defensive_TOpct'=def_to_pct, 'Defensive_OREBpct'=def_or_pct, Defensive_FTr=def_ftr))
+  
   
   #pull trending stats and other stats used for formatting
   opp_game_stats = reactive(kp_team_schedule(opponent_kp(), year) %>%
@@ -656,7 +680,7 @@ server = function(input, output, session) {
                               full_join(kp_opptracker(opponent_kp(), year), by = c("opponent", "game_date")) %>%
                               mutate(opponent = clean_school_names(opponent)) %>%
                               select(date, game_date, location, opponent, wl, team_score, opponent_score, conference_game) %>%
-                              mutate(Winning_Margin = ifelse(is.na(team_score), 0, team_score - opponent_score),
+                              mutate(Winning_Margin = ifelse(is.na(team_score), NA, team_score - opponent_score),
                                      #create a unique identifier for each game since teams can be played multiple times
                                      game_code = paste(opponent, game_date),
                                      #if not a true home game, consider it a road game
@@ -675,8 +699,11 @@ server = function(input, output, session) {
                                      conference_game = ifelse(conference_game==TRUE, opp_conf(), "OOC")) %>%
                               #create ATS Margin
                               left_join(opp_spreads(), by="game_date") %>%
-                              mutate(ATS_Margin = Winning_Margin + spread,
-                                     ATS_Margin = ifelse(is.na(ATS_Margin), 0, ATS_Margin)))
+                              mutate(ATS_Margin = Winning_Margin + spread) %>%
+                              #join in other used stats
+                              left_join(opp_gp_stats(), by="game_date"))
+  
+  output$test = renderDataTable(opp_game_stats())
   
   #create separate data frames to split the data based on the input so that we can calculate mean in each split
   opp_game_stats_recency5 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
@@ -746,7 +773,7 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("pct", "%", gsub("_", " ", input$trendingStat))) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
           guides(fill = guide_legend(title = NULL)) +
@@ -841,7 +868,7 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1)}
       
       else if(input$trendIndicators == "Location"){
@@ -865,7 +892,7 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4)}
       
@@ -894,7 +921,7 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18)}
       
@@ -921,7 +948,7 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18)}
     }
@@ -949,11 +976,11 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
@@ -980,12 +1007,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
@@ -1016,12 +1043,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
@@ -1050,12 +1077,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
     }
     
@@ -1082,11 +1109,11 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
                          linetype="Home"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
                          linetype="Away"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
@@ -1113,12 +1140,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
                          linetype="Home"), color = color3 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
                          linetype="Away"), color = color4 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
@@ -1149,12 +1176,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
                          linetype="Home"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
                          linetype="Away"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
@@ -1183,12 +1210,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
                          linetype="Home"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
                          linetype="Away"), color = color6 , size = 1)}
     }
     
@@ -1246,12 +1273,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat], na.rm=T),
                          linetype="Wins"), color = color1 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat], na.rm=T),
                          linetype="Losses"), color = color2 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
@@ -1282,12 +1309,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat], na.rm=T),
                          linetype="Wins"), color = color1 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat], na.rm=T),
                          linetype="Losses"), color = color2 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
@@ -1316,12 +1343,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat], na.rm=T),
                          linetype="Wins"), color = color1 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat], na.rm=T),
                          linetype="Losses"), color = color2 , size = 1)}
     }
     
@@ -1348,11 +1375,11 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 50"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 100"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
@@ -1379,12 +1406,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 50"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 100"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
@@ -1415,12 +1442,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 50"), color = color3 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 100"), color = color4 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
@@ -1449,12 +1476,12 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 50"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
                          linetype="NET Top 100"), color = color6 , size = 1)}
     }
     
@@ -1481,9 +1508,9 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
                          linetype="Conference Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
@@ -1510,10 +1537,10 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
                          linetype="Conference Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
@@ -1544,10 +1571,10 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
                          linetype="Conference Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
@@ -1576,10 +1603,10 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
                          linetype="Conference Games"), color = color3 , size = 1)}
     }
     )
