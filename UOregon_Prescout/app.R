@@ -1,6 +1,6 @@
 library(shiny)
 library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, hoopR, paletteer, toRvik, ggtext)
+p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, hoopR, paletteer, toRvik, ggtext, readxl)
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
@@ -12,6 +12,7 @@ GMC_AP = read.csv("data/GMC_AP.csv")
 GMC_OS = read.csv("data/GMC_OS.csv")
 GMC_NET = read.csv("data/GMC_NET.csv")
 GMC_medians = read.csv("data/GMC_medians.csv")
+graphic_info_OS = read.csv("data/graphic_info_OS.csv")
 
 #the list of options for our metric comparison plots
 MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
@@ -145,7 +146,7 @@ server = function(input, output, session) {
                  else if (input$displayedTeams == "NET Top 50"){GMC_NET})
   #add 'focus' aesthetics to our team and opponent
   GMC_df = reactive(GMC() %>% mutate(color2 = if_else(school == our_team | school == input$opponent | school == opponent_kp(), NA_character_ ,"b/w"),
-                                   alpha = if_else(school == our_team | school == input$opponent | school == opponent_kp(), 1, .6)))
+                                     alpha = if_else(school == our_team | school == input$opponent | school == opponent_kp(), 1, .6)))
    
   #Set x var and y var for axis labels
   xvar = reactive(str_split(input$whichGraph, " x ")[[1]][1])
@@ -203,123 +204,10 @@ server = function(input, output, session) {
         theme_bw()}
   }) #end of MetricComp output
   
-  #reactive expressions for SR data depending on opponent
-  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% .[[1,2]])
-  SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
-  
   #creates a variable for opponent name when referring to kp functions
   opponent_kp = reactive(if(input$opponent == "UCONN"){"Connecticut"}
                          else{gsub(" State", " St.", input$opponent)})
   
-  #PPT Data coming from different sources
-  SR_PPT = reactive(SRopponentTables()[[1]] %>%
-                      select('#', Player, Pos) %>%
-                      # 5 steps to standardize player's names but not overwrite the original col of names
-                      mutate(player_join = gsub("\\.", "", Player)) %>% 
-                      mutate(player_join = gsub("'", "", player_join)) %>%
-                      separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
-                      mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
-                      select(-first_join, -last_join) %>%
-                      distinct())
-  
-  SR2_PPT = reactive(SRopponentTables()[[6]] %>%
-                       select(Player, G, GS, MPG=MP, twoPperc="2P%", threePperc="3P%", ftperc="FT%", ApG=AST, TOV, PPG=PTS) %>%
-                       # 5 steps to standardize player's names but not overwrite the original col of names
-                       mutate(player_join = gsub("\\.", "", Player)) %>% 
-                       mutate(player_join = gsub("'", "", player_join)) %>%
-                       separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
-                       mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
-                       select(-first_join, -last_join, -Player))
-  
-  SR3_PPT = reactive(SRopponentTables()[[14]] %>%
-                       select(Player, "USG%", eFGperc="eFG%", tsperc="TS%", threePAr="3PAr", "FTr", "AST%", "TOV%", 
-                              "PER", "OBPM", "DBPM", "BPM", "ORB%", "DRB%", "TRB%", "STL%", "BLK%") %>%
-                       # 5 steps to standardize player's names but not overwrite the original col of names
-                       mutate(player_join = gsub("\\.", "", Player)) %>% 
-                       mutate(player_join = gsub("'", "", player_join)) %>%
-                       separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
-                       mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
-                       select(-first_join, -last_join, -Player))
-  
-  KP_PPT = reactive(kp_team_players(opponent_kp(), year) %>%
-                      select(number, ht, wt, yr, poss_pct, f_dper40, f_cper40))
-  
-  headshots_PPT = reactive(headshot_urls_db %>% filter(Team == input$opponent) %>%
-                             # 5 steps to standardize player's names but not overwrite the original col of names
-                             mutate(player_join = gsub("\\.", "", Player)) %>% 
-                             mutate(player_join = gsub("'", "", player_join)) %>%
-                             separate(player_join, into = c("first_join","last_join"), extra = "drop", sep = "[^\\w']") %>%
-                             mutate(player_join = toupper(paste(first_join, last_join, sep = " "))) %>%
-                             select(-first_join, -last_join, -Player))
-  
-  #find player position
-  kp_pos = reactive(kp_team_depth_chart(opponent_kp(), year))
-  pos_pg = reactive(kp_pos() %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct, '#' = pg_number) %>% mutate(pos="PG") %>% filter(!is.na(first)))
-  pos_sg = reactive(kp_pos() %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct, '#' = sg_number) %>% mutate(pos="SG") %>% filter(!is.na(first)))
-  pos_sf = reactive(kp_pos() %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct, '#' = sf_number) %>% mutate(pos="SF") %>% filter(!is.na(first)))
-  pos_pf = reactive(kp_pos() %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct, '#' = pf_number) %>% mutate(pos="PF") %>% filter(!is.na(first)))
-  pos_c = reactive(kp_pos() %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct, '#' = c_number) %>% mutate(pos="C") %>% filter(!is.na(first)))
-  KP2_PPT = reactive(rbind(pos_pg(), pos_sg(), pos_sf(), pos_pf(), pos_c()) %>% 
-                       pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% 
-                       mutate(total=PG+SG+SF+PF+C) %>%
-                       mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-9] %>%
-                       select('#', PG, SG, SF, PF, C))
-  
-  #find starters for last game the team played
-  lastGdate = reactive(kp_team_schedule(opponent_kp(), year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]])
-  opponentGID = reactive(espn_mbb_scoreboard(lastGdate()) %>%
-                           filter(toupper(home_team_location) == toupper(input$opponent) | toupper(away_team_location) == toupper(input$opponent)) %>% .[[1,6]])
-  lastGstarters = reactive(espn_mbb_player_box(opponentGID()) %>% 
-                             mutate(athlete_jersey = as.double(athlete_jersey)) %>%
-                             filter(starter==TRUE) %>%
-                             filter(toupper(team_short_display_name) == toupper(gsub(" St.", " St", opponent_kp())) |
-                                      toupper(team_short_display_name) == toupper(input$opponent)) %>%
-                             select("#" = athlete_jersey, starter))
-  
-  #join together all sources of info for PPT
-  PPT_data = reactive(SR_PPT() %>%
-                        full_join(SR2_PPT(), by = 'player_join') %>%
-                        full_join(SR3_PPT(), by = 'player_join') %>%
-                        full_join(KP_PPT(), by = c('#' = 'number')) %>%
-                        full_join(headshots_PPT(), by = 'player_join') %>%
-                        full_join(KP2_PPT(), by = '#') %>%
-                        left_join(lastGstarters(), by = '#') %>%
-                        mutate('All Players' = 1,
-                               "Guards" = ifelse(PG+SG>.7, 1, 0),
-                               "Bigs" = ifelse(C+PF>.8 & C>0 , 1, 0),
-                               "Wings" = ifelse(Guards+Bigs==0, 1, 0),
-                               "Starters" = ifelse(is.na(starter), 0, 1),
-                               "Lefties" = 0) %>%
-                        mutate(PG = as.numeric(ifelse(PG==0, NA, PG*100)),
-                               SG = as.numeric(ifelse(SG==0, NA, SG*100)),
-                               SF = as.numeric(ifelse(SF==0, NA, SF*100)),
-                               PF = as.numeric(ifelse(PF==0, NA, PF*100)),
-                               C = as.numeric(ifelse(C==0, NA, C*100))) %>%
-                        mutate(twoPperc = round(twoPperc*100, 1),
-                               threePperc = round(threePperc*100, 1),
-                               threePAr = round(threePAr*100, 1),
-                               eFGperc = round(eFGperc*100, 1),
-                               tsperc = round(tsperc*100, 1),
-                               ftperc = round(ftperc*100, 1),
-                               FTr = round(FTr*100, 1)) %>%
-                        mutate(G = ifelse(!is.na(G), G, 0),
-                               MPG = ifelse(!is.na(MPG), MPG, 0),
-                               "AST:TO" = round(ApG / TOV, 2)) %>%
-                        select(-starter, -player_join) %>%
-                        separate(Player, into = c('first', 'last'), sep = "[^\\w'.-]", extra = 'merge') %>%
-                        #order columns into the order I want them to appear in the PPT
-                        select("#", URL, first, last, Team, 
-                               Class=yr, Pos, Height=ht, Weight=wt, 
-                               GP=G, GS, MPG, "Poss%"=poss_pct, "USG%",
-                               PG, SG, SF, PF, C,
-                               PER, OBPM, DBPM, BPM,
-                               PPG, "FD/40"=f_dper40,
-                               "2P%"=twoPperc, "3P%"=threePperc, "3PAr"=threePAr, "eFG%"=eFGperc, "TS%"=tsperc, "FT%"=ftperc, FTr,
-                               ApG, "AST:TO", "AST%", "TOV%",
-                               "ORB%", "DRB%", "TRB%",
-                               "STL%", "BLK%", "FC/40"=f_cper40,
-                               "All Players", Guards, Wings, Bigs, Starters, Lefties))
-                        
   
   #filter and sort PPtable_raw before making it a gt object
   filter_PPT = reactive({
@@ -328,6 +216,10 @@ server = function(input, output, session) {
       pull(TCLV) %>%
       unlist()
   })
+  
+  PPT_data = reactive(read.csv(paste0("data/PPT_data.csv"), check.names = FALSE) %>%
+                        filter(Team == input$opponent))
+  
   sort_PPT = reactive(PPT_data() %>% 
                         filter(.data[[input$filterPPT]] == 1) %>%
                         filter(.data[["GP"]] >= input$minGP_PPT_in) %>%
@@ -340,7 +232,7 @@ server = function(input, output, session) {
     filter(!is.na(w)) %>%
     nrow() %>% as.numeric())
   
-  #take this out due to it messing up my R session constantly. I was not able to figure out why
+  #this line is working but causes an error to show every time the app is run
   output$minGP_PPT_out = renderUI({sliderInput("minGP_PPT_in", "Games Played Minimum", value=0, min=0, max=opp_n_games())})
 
   #color for opponent
@@ -467,7 +359,7 @@ server = function(input, output, session) {
           rows = everything()))
     )
   
-  #how many columns are in our mostly finished gt table
+  #how many columns are in our mostly finished gt table for alternating cell shading purposes
   PPT_v1_cols = reactive(ncol(PPT_v1()$'_data'))
   
   #format column shading

@@ -20,6 +20,7 @@ basic_offense = read_html(basic_offense_url) %>%
 #add offense label to col names
 colnames(basic_offense)= c(colnames(basic_offense[,1:7]), paste("offense_", colnames(basic_offense[,8:24]), sep = ""))
 
+Sys.sleep(5)
 
 #####basic defense table webscrape
 basic_defense_url = "https://www.sports-reference.com/cbb/seasons/2023-opponent-stats.html"
@@ -35,6 +36,7 @@ basic_defense = read_html(basic_defense_url) %>%
 #add defense label to col names
 colnames(basic_defense)= c(colnames(basic_defense[,1:7]), paste("defense_", colnames(basic_defense[,8:24]), sep = ""))
 
+Sys.sleep(5)
 
 #####advanced offense table webscrape
 advanced_offense_url = "https://www.sports-reference.com/cbb/seasons/2023-advanced-school-stats.html"
@@ -49,6 +51,8 @@ advanced_offense = read_html(advanced_offense_url) %>%
   .[,-c(1, 9:16)] #removes columns for conference, home, and away team records
 colnames(advanced_offense)= c(colnames(advanced_offense[,1:7]), paste("offense_", colnames(advanced_offense[,8:20]), sep = ""))
 
+Sys.sleep(5)
+
 #####advanced defense table webscrape
 advanced_defense_url = "https://www.sports-reference.com/cbb/seasons/2023-advanced-opponent-stats.html"
 
@@ -61,6 +65,8 @@ advanced_defense = read_html(advanced_defense_url) %>%
   mutate(school = ifelse(endsWith(school, "NCAA"), substr(school, 1, nchar(school)-5), school)) %>%
   .[,-c(1, 9:16)] #removes columns for conference, home, and away team records
 colnames(advanced_defense)= c(colnames(advanced_defense[,1:7]), paste("defense_", colnames(advanced_defense[,8:20]), sep = ""))
+
+Sys.sleep(5)
 
 #put all tables into one 
 SR_team_stats = left_join(basic_offense, basic_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
@@ -154,13 +160,11 @@ for(c in 2:ncol(SR_team_stats)){
   GMC_medians[1,c-1] = median(a)
 }
 colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
-rm(a, c, all_graphic_info, graphic_info_AP, graphic_info_NET, graphic_info_OS)
+rm(a, c, all_graphic_info, graphic_info_AP, graphic_info_NET)
 
-
-
-
-
-
+#read headshot url table
+headshot_urls_db = read_xlsx("UOregon_Prescout/headshot_url.xlsx") %>%
+  mutate(URL = ifelse(is.na(URL), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
 
 
 
@@ -170,3 +174,137 @@ write.csv(GMC_AP, file = "UOregon_Prescout/data/GMC_AP.csv", row.names = FALSE)
 write.csv(GMC_OS, file = "UOregon_Prescout/data/GMC_OS.csv", row.names = FALSE)
 write.csv(GMC_NET, file = "UOregon_Prescout/data/GMC_NET.csv", row.names = FALSE)
 write.csv(GMC_medians, file = "UOregon_Prescout/data/GMC_medians.csv", row.names = FALSE)
+write.csv(graphic_info_OS, file = "UOregon_Prescout/data/graphic_info_OS.csv", row.names = FALSE)
+
+
+
+#write a function that will standardize a player's name
+standardize_name = function(player_name){
+  #remove periods
+  name = gsub("\\.", "", player_name)
+  #remove apostrophe
+  name = gsub("'", "", name)
+  #remove dashes
+  name = gsub("-", "", name)
+  #remove spaces and any third or more name element
+  name = paste0(strsplit(name, split = " ")[[1]][1], strsplit(name, split = " ")[[1]][2])
+  #upcase all letters
+  name = toupper(name)
+  return(name)
+}
+standardize_name = Vectorize(standardize_name)
+
+
+
+#opponent specific data
+
+#list of teams that we will pull data for
+data_needed_for = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
+#empty df to populate
+PPT_data = data.frame()
+
+for(opp in data_needed_for){
+  #SR data
+  opponentSRurl = opponentSRurl_db %>% filter(opponent == opp) %>% .[[1,2]]
+  SRopponentTables = read_html(opponentSRurl) %>% html_table()
+  
+  #creates a variable for opponent name when referring to kp functions
+  opponent_kp = if(opp == "UCONN"){"Connecticut"} else{gsub(" State", " St.", opp)}
+  
+  #PPT Data coming from different sources
+  SR_PPT = SRopponentTables[[1]] %>%
+    select('#', Player, Pos) %>%
+    mutate(player_join = standardize_name(Player)) %>%
+    distinct() #there is one team that I found that has a duplicate player in this SR table
+  SR2_PPT = SRopponentTables[[6]] %>%
+    select(Player, G, GS, MPG=MP, twoPperc="2P%", threePperc="3P%", ftperc="FT%", ApG=AST, TOV, PPG=PTS) %>%
+    mutate(player_join = standardize_name(Player))
+  SR3_PPT = SRopponentTables[[14]] %>%
+    select(Player, "USG%", eFGperc="eFG%", tsperc="TS%", threePAr="3PAr", "FTr", "AST%", "TOV%", 
+           "PER", "OBPM", "DBPM", "BPM", "ORB%", "DRB%", "TRB%", "STL%", "BLK%") %>%
+    mutate(player_join = standardize_name(Player))
+  KP_PPT = kp_team_players(opponent_kp, year) %>%
+    select(number, ht, wt, yr, poss_pct, f_dper40, f_cper40)
+  headshots_PPT = headshot_urls_db %>% filter(Team == opp) %>%
+    mutate(player_join = standardize_name(Player))
+  
+  #find player position
+  kp_pos = kp_team_depth_chart(opponent_kp, year)
+  pos_pg = kp_pos %>% select(first = pg_player_first_name, last = pg_player_last_name, min_pct = pg_min_pct, '#' = pg_number) %>% mutate(pos="PG") %>% filter(!is.na(first))
+  pos_sg = kp_pos %>% select(first = sg_player_first_name, last = sg_player_last_name, min_pct = sg_min_pct, '#' = sg_number) %>% mutate(pos="SG") %>% filter(!is.na(first))
+  pos_sf = kp_pos %>% select(first = sf_player_first_name, last = sf_player_last_name, min_pct = sf_min_pct, '#' = sf_number) %>% mutate(pos="SF") %>% filter(!is.na(first))
+  pos_pf = kp_pos %>% select(first = pf_player_first_name, last = pf_player_last_name, min_pct = pf_min_pct, '#' = pf_number) %>% mutate(pos="PF") %>% filter(!is.na(first))
+  pos_c = kp_pos %>% select(first = c_player_first_name, last = c_player_last_name, min_pct = c_min_pct, '#' = c_number) %>% mutate(pos="C") %>% filter(!is.na(first))
+  KP2_PPT = rbind(pos_pg, pos_sg, pos_sf, pos_pf, pos_c) %>% 
+    pivot_wider(names_from = pos, values_from = min_pct, values_fill = 0) %>% 
+    mutate(total=PG+SG+SF+PF+C) %>%
+    mutate(PG = PG/total, SG=SG/total, SF=SF/total, PF=PF/total, C=C/total) %>% .[,-9] %>%
+    select('#', PG, SG, SF, PF, C)
+  
+  #find starters for last game the team played
+  lastGdate = kp_team_schedule(opponent_kp, year=year) %>% filter(is.na(pre_wp)) %>% arrange(desc(date)) %>% .[[1,18]]
+  opponentGID = espn_mbb_scoreboard(lastGdate) %>%
+    filter(toupper(home_team_location) == toupper(opp) | toupper(away_team_location) == toupper(opp)) %>% .[[1,6]]
+  lastGstarters = espn_mbb_player_box(opponentGID) %>% 
+                             mutate(athlete_jersey = as.double(athlete_jersey)) %>%
+                             filter(starter==TRUE) %>%
+                             filter(toupper(team_short_display_name) == toupper(gsub(" St.", " St", opponent_kp)) |
+                                      toupper(team_short_display_name) == toupper(opp)) %>%
+                             select("#" = athlete_jersey, starter)
+  
+  #join together all sources of info for PPT
+  PPT_data_temp = SR_PPT %>%
+    full_join(SR2_PPT, by = 'player_join') %>%
+    full_join(SR3_PPT, by = 'player_join') %>%
+    full_join(KP_PPT, by = c('#' = 'number')) %>%
+    full_join(headshots_PPT, by = 'player_join') %>%
+    full_join(KP2_PPT, by = '#') %>%
+    left_join(lastGstarters, by = '#') %>%
+    mutate('All Players' = 1,
+           "Guards" = ifelse(PG+SG>.7, 1, 0),
+           "Bigs" = ifelse(C+PF>.8 & C>0 , 1, 0),
+           "Wings" = ifelse(Guards+Bigs==0, 1, 0),
+           "Starters" = ifelse(is.na(starter), 0, 1),
+           "Lefties" = 0 ) %>% #don't know where I can find data on this yet
+    #make 0s a NA so they don't show up in the table and multiply the other values so they don't show up as decimals
+    mutate(PG = as.numeric(ifelse(PG==0, NA, PG*100)),
+           SG = as.numeric(ifelse(SG==0, NA, SG*100)),
+           SF = as.numeric(ifelse(SF==0, NA, SF*100)),
+           PF = as.numeric(ifelse(PF==0, NA, PF*100)),
+           C = as.numeric(ifelse(C==0, NA, C*100))) %>%
+    #round percentages
+    mutate(twoPperc = round(twoPperc*100, 1),
+           threePperc = round(threePperc*100, 1),
+           threePAr = round(threePAr*100, 1),
+           eFGperc = round(eFGperc*100, 1),
+           tsperc = round(tsperc*100, 1),
+           ftperc = round(ftperc*100, 1),
+           FTr = round(FTr*100, 1)) %>%
+    mutate(G = ifelse(!is.na(G), G, 0),
+           MPG = ifelse(!is.na(MPG), MPG, 0),
+           "AST:TO" = round(ApG / TOV, 2)) %>%
+    select(-starter, -player_join) %>%
+    separate(Player.x, into = c('first', 'last'), sep = "[^\\w'.-]", extra = 'merge') %>%
+    #order columns into the order I want them to appear in the PPT
+    select("#", URL, first, last, Team, 
+           Class=yr, Pos, Height=ht, Weight=wt, 
+           GP=G, GS, MPG, "Poss%"=poss_pct, "USG%",
+           PG, SG, SF, PF, C,
+           PER, OBPM, DBPM, BPM,
+           PPG, "FD/40"=f_dper40,
+           "2P%"=twoPperc, "3P%"=threePperc, "3PAr"=threePAr, "eFG%"=eFGperc, "TS%"=tsperc, "FT%"=ftperc, FTr,
+           ApG, "AST:TO", "AST%", "TOV%",
+           "ORB%", "DRB%", "TRB%",
+           "STL%", "BLK%", "FC/40"=f_cper40,
+           "All Players", Guards, Wings, Bigs, Starters, Lefties)
+  
+  PPT_data = rbind(PPT_data, PPT_data_temp)
+
+  
+  
+  
+
+  Sys.sleep(15)
+}
+
+write.csv(PPT_data, file = "UOregon_Prescout/data/PPT_data.csv", row.names = FALSE)
