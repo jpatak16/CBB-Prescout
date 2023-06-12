@@ -217,10 +217,10 @@ server = function(input, output, session) {
       unlist()
   })
   
-  PPT_data = reactive(read.csv(paste0("data/PPT_data.csv"), check.names = FALSE) %>%
-                        filter(Team == input$opponent))
+  PPT_data = reactive(read.csv(paste0("data/PPT_data.csv"), check.names = FALSE))
+  PPT_data_filtered = PPT_data() %>% filter(Team == input$opponent)
   
-  sort_PPT = reactive(PPT_data() %>% 
+  sort_PPT = reactive(PPT_data_filtered() %>% 
                         filter(.data[[input$filterPPT]] == 1) %>%
                         filter(.data[["GP"]] >= input$minGP_PPT_in) %>%
                         filter(.data[["MPG"]] >= input$minMinsPPT) %>%
@@ -379,81 +379,7 @@ server = function(input, output, session) {
                                        gt_color_rows(columns = starts_with(input$sortPPT) & ends_with(input$sortPPT), 
                                                      palette = c("red", "white", "darkgreen"),
                                                      domain = PPT_data()[[input$sortPPT]]))
-  #find the conference of our opp
-  opp_conf = reactive(kp_program_ratings() %>%
-                        #manually change the abbreviation of certain conferences
-                        mutate(conf = ifelse(conf == "Amer", "AAC", conf)) %>%
-                        filter(team == opponent_kp()) %>%
-                        .[[1,3]])
   
-  #opponent espn id of opp
-  opp_id = reactive(espn_mbb_teams() %>%
-                      filter(toupper(team) == toupper(input$opponent)) %>%
-                      select(team_id) %>%
-                      .[[1,1]])
-  
-  #find the spread in every game our opp has played this season
-  opp_spreads = reactive({
-    df <- load_mbb_schedule() %>% 
-      filter(home_id == opp_id() | away_id == opp_id(),
-             status_type_completed == TRUE) %>%
-      select(game_id = id, date, home_short_display_name, away_short_display_name, home_id, away_id) %>%
-      arrange(date) %>%
-      mutate(spread = NA,
-             #turn date from a character to a date column and adjust the time zone so the correct date is reflected
-             date = gsub("T", " ", date),
-             date = gsub("Z", ":00", date),
-             date = strptime(date, "%Y-%m-%d %H:%M:%S") - 6*60*60,
-             game_date = gsub("-", "", substr(date, 1, 10)))
-                      
-    for(r in 1:nrow(df)) {
-      df[r,"spread"] = espn_mbb_betting(df$game_id[r])[[1]] %>% 
-        filter(provider_name == "consensus") %>% .[[1,"spread"]] %>% as.integer()}
-    
-    df <- df %>% 
-      mutate(spread = ifelse(home_id == opp_id(), spread, spread*-1),
-             game_date = as.double(game_date)) %>%
-      select(game_date, spread)
-      
-    })
-  
-  #find other stats used in OO Trend table and format column names to match select input
-  opp_gp_stats = reactive(kp_gameplan(opponent_kp(), year)[[1]] %>%
-                            select(game_date, Pace=pace, Offensive_Efficency=off_eff, Defensive_Efficency=def_eff, Points_Scored=team_score, Points_Allowed=opponent_score, 
-                                   Offensive_3PAr=off_fg_3a_pct, 'Offensive_3Ppct'=off_fg_3_pct, 'Offensive_TOpct'=off_to_pct, 'Offensive_OREBpct'=off_or_pct, Offensive_FTr=off_ftr, 
-                                   Defensive_3PAr=def_fg_3a_pct, 'Defensive_3Ppct'=def_fg_3_pct, 'Defensive_TOpct'=def_to_pct, 'Defensive_OREBpct'=def_or_pct, Defensive_FTr=def_ftr))
-  
-  
-  #pull trending stats and other stats used for formatting
-  opp_game_stats = reactive(kp_team_schedule(opponent_kp(), year) %>%
-                              select(opponent, game_date, location, conference_game) %>%
-                              full_join(kp_opptracker(opponent_kp(), year), by = c("opponent", "game_date")) %>%
-                              mutate(opponent = clean_school_names(opponent)) %>%
-                              select(date, game_date, location, opponent, wl, team_score, opponent_score, conference_game) %>%
-                              mutate(Winning_Margin = ifelse(is.na(team_score), NA, team_score - opponent_score),
-                                     #create a unique identifier for each game since teams can be played multiple times
-                                     game_code = paste(opponent, game_date),
-                                     #if not a true home game, consider it a road game
-                                     location = ifelse(location=="Home", "Home", "Away")) %>%
-                              #find NET rankings for teams our opp has played
-                              left_join(bart_tourney_sheets() %>%
-                                          mutate(team = gsub(" N4O", "", team),
-                                                 team = gsub(" F4O", "", team), 
-                                                 team = gsub(" St.", " State", team),
-                                                 team = ifelse(team=="McNeese State", "McNeese St.", team)) %>%
-                                          mutate(team = clean_school_names(team)) %>%
-                                          select(opponent=team, net)) %>%
-                              mutate(net_rk = ifelse(net <= 100, 
-                                                     ifelse(net <= 50, "NET Top 50", "NET Top 100"), 
-                                                     "Other"),
-                                     conference_game = ifelse(conference_game==TRUE, opp_conf(), "OOC")) %>%
-                              #create ATS Margin
-                              left_join(opp_spreads(), by="game_date") %>%
-                              mutate(ATS_Margin = Winning_Margin + spread) %>%
-                              #join in other used stats
-                              left_join(opp_gp_stats(), by="game_date"))
-  
-  output$test = renderDataTable(opp_game_stats())
   
   #create separate data frames to split the data based on the input so that we can calculate mean in each split
   opp_game_stats_recency5 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
