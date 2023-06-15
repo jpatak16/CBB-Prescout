@@ -409,8 +409,8 @@ for(opp in data_needed_for){
       mutate(recency5 = "Last 5 Games",
              Team = opp,
              split = 'recency5',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     opp_game_stats_recency10 = opp_game_stats %>% filter(!is.na(team_score)) %>%
@@ -418,64 +418,64 @@ for(opp in data_needed_for){
       mutate(recency10 = "Last 10 Games",
              Team = opp,
              split = 'recency10',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     opp_game_stats_home = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(location == "Home") %>%
       mutate(Team = opp,
              split = 'home',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     opp_game_stats_away = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(location == "Away") %>%
       mutate(Team = opp,
              split = 'away',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     opp_game_stats_net50 = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(net <= 50) %>%
       mutate(Team = opp,
              split = 'net50',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
 
     opp_game_stats_net100 = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(net <= 100) %>%
       mutate(Team = opp,
              split = 'net100',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     opp_game_stats_wins = opp_game_stats %>%
       filter(wl == "W") %>%
       mutate(Team = opp,
              split = 'wins',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     opp_game_stats_losses = opp_game_stats %>%
       filter(wl == "L") %>%
       mutate(Team = opp,
              split = 'losses',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     opp_game_stats_conf = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(conference_game == opp_conf) %>%
       mutate(Team = opp,
              split = 'conf',
-             input = stat) %>%
-      select(Team, split, input, game_code, stat) %>%
+             variable = stat) %>%
+      select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
     
     OO_trend_per_stat = rbind(opp_game_stats_recency5, opp_game_stats_recency10,

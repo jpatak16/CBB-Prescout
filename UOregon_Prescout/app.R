@@ -13,6 +13,9 @@ GMC_OS = read.csv("data/GMC_OS.csv")
 GMC_NET = read.csv("data/GMC_NET.csv")
 GMC_medians = read.csv("data/GMC_medians.csv")
 graphic_info_OS = read.csv("data/graphic_info_OS.csv")
+PPT_data = read.csv("data/PPT_data.csv", check.names = FALSE)
+OO_splits_data = read.csv("data/OO_splits_data.csv")
+Opp_Trends_df = read.csv("data/Opp_Trends_df.csv")
 
 #the list of options for our metric comparison plots
 MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
@@ -217,8 +220,7 @@ server = function(input, output, session) {
       unlist()
   })
   
-  PPT_data = reactive(read.csv(paste0("data/PPT_data.csv"), check.names = FALSE))
-  PPT_data_filtered = PPT_data() %>% filter(Team == input$opponent)
+  PPT_data_filtered = reactive(PPT_data %>% filter(Team == input$opponent))
   
   sort_PPT = reactive(PPT_data_filtered() %>% 
                         filter(.data[[input$filterPPT]] == 1) %>%
@@ -378,58 +380,79 @@ server = function(input, output, session) {
                                                starts_with("C") & ends_with("C"))) %>%
                                        gt_color_rows(columns = starts_with(input$sortPPT) & ends_with(input$sortPPT), 
                                                      palette = c("red", "white", "darkgreen"),
-                                                     domain = PPT_data()[[input$sortPPT]]))
+                                                     domain = PPT_data[[input$sortPPT]]))
   
+  opp_conf = reactive(kp_program_ratings() %>%
+                        #manually change the abbreviation of certain conferences
+                        mutate(conf = ifelse(conf == "Amer", "AAC", conf)) %>%
+                        filter(team == opponent_kp()) %>%
+                        .[[1,3]])
   
-  #create separate data frames to split the data based on the input so that we can calculate mean in each split
-  opp_game_stats_recency5 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
-                                       .[(nrow(opp_game_stats() %>% filter(!is.na(team_score)))-4):nrow(opp_game_stats() %>% filter(!is.na(team_score))),] %>%
-                                       mutate(recency5 = "Last 5 Games") %>%
-                                       select(game_code, recency5, input$trendingStat))
+  #for each split, find the needed mean given the team and stat inputs
+  recency5_mean = reactive(OO_splits_data %>% 
+                             filter(Team == input$opponent,
+                                    split == 'recency5',
+                                    variable == input$trendingStat) %>%
+                             select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_recency10 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
-                                        .[(nrow(opp_game_stats() %>% filter(!is.na(team_score)))-9):nrow(opp_game_stats() %>% filter(!is.na(team_score))),] %>%
-                                        mutate(recency10 = "Last 10 Games") %>%
-                                        select(game_code, recency10, input$trendingStat))
+  recency10_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                    split == 'recency10',
+                                    variable == input$trendingStat) %>%
+                             select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_home = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
-                                   filter(location == "Home") %>%
-                                   select(game_code, location, input$trendingStat))
+  home_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                     split == 'home',
+                                     variable == input$trendingStat) %>%
+                              select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_away = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
-                                   filter(location == "Away") %>%
-                                   select(game_code, location, input$trendingStat))
+  away_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                     split == 'away',
+                                     variable == input$trendingStat) %>%
+                              select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_net50 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
-                                    filter(net <= 50) %>%
-                                    select(game_code, net, input$trendingStat))
+  net50_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                     split == 'net50',
+                                     variable == input$trendingStat) %>%
+                              select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_net100 = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
-                                    filter(net <= 100) %>%
-                                    select(game_code, net, input$trendingStat))
+  net100_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                     split == 'net100',
+                                     variable == input$trendingStat) %>%
+                              select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_wins = reactive(opp_game_stats() %>%
-                                     filter(wl == "W") %>%
-                                     select(game_code, wl, input$trendingStat))
+  wins_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                     split == 'wins',
+                                     variable == input$trendingStat) %>%
+                              select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_losses = reactive(opp_game_stats() %>%
-                                   filter(wl == "L") %>%
-                                   select(game_code, wl, input$trendingStat))
+  losses_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                     split == 'losses',
+                                     variable == input$trendingStat) %>%
+                              select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
-  opp_game_stats_conf = reactive(opp_game_stats() %>% filter(!is.na(team_score)) %>%
-                                     filter(conference_game == opp_conf()) %>%
-                                     select(game_code, conference_game, input$trendingStat))
+  conf_mean = reactive(OO_splits_data %>% 
+                              filter(Team == input$opponent,
+                                     split == 'conf',
+                                     variable == input$trendingStat) %>%
+                              select(stats) %>% colMeans(na.rm = T) %>% .[[1]])
   
   #limit teams on the trends graph to games that have been played already and the next three games
-  Opp_Trends_df = reactive(rbind(opp_game_stats() %>% filter(!is.na(team_score)),
-                                  opp_game_stats() %>% filter(is.na(team_score)) %>% .[1:3,]) %>%
-                             filter(!is.na(opponent)))
+  Opp_Trends_df_filtered = reactive(Opp_Trends_df %>%
+                                      filter(Team == input$opponent) %>%
+                                      select(-Team))
   
   #create columns so we can access date info and order of games for easier shading
-  Opp_Trends_df_dates = reactive(Opp_Trends_df() %>%
+  Opp_Trends_df_dates = reactive(Opp_Trends_df_filtered() %>%
     mutate(month = substr(game_date, 5, 6),
            day = substr(game_date, 7, 8),
-           game_num = seq(1, nrow(Opp_Trends_df()))))
+           game_num = seq(1, nrow(Opp_Trends_df_filtered()))))
   
   #find max and min games of months that need shading
   dec_min = reactive(Opp_Trends_df_dates() %>% filter(month==12) %>% arrange(day) %>% .[1, "game_num"] %>% as.numeric() %>% sum(-.5))
@@ -442,13 +465,13 @@ server = function(input, output, session) {
     if(input$trendSplits == "OFF"){
       
       if(input$trendIndicators == "OFF"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("pct", "%", gsub("_", " ", input$trendingStat))) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -458,13 +481,13 @@ server = function(input, output, session) {
                              legend.direction = "horizontal")}
       
       else if(input$trendIndicators == "Location"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -478,13 +501,13 @@ server = function(input, output, session) {
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4)}
       
       else if(input$trendIndicators == "NET"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -502,13 +525,13 @@ server = function(input, output, session) {
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18)}
       
       else if(input$trendIndicators == "Conference"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -527,13 +550,13 @@ server = function(input, output, session) {
     else if(input$trendSplits == "All"){
       
       if(input$trendIndicators == "OFF"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -544,17 +567,17 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1)}
       
       else if(input$trendIndicators == "Location"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -568,18 +591,18 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4)}
       
       else if(input$trendIndicators == "NET"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -597,18 +620,18 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18)}
       
       else if(input$trendIndicators == "Conference"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -624,7 +647,7 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18)}
     }
@@ -632,13 +655,13 @@ server = function(input, output, session) {
     else if(input$trendSplits == "Recency"){
       
       if(input$trendIndicators == "OFF"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -652,21 +675,21 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency5_mean(),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency10_mean(),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -683,22 +706,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency5_mean(),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency10_mean(),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -719,22 +742,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency5_mean(),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency10_mean(),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -753,25 +776,25 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency5()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency5_mean(),
                          linetype="Last 5 Games"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_recency10()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = recency10_mean(),
                          linetype="Last 10 Games"), color = color6 , size = 1)}
     }
     
     else if(input$trendSplits == "Location"){
       
       if(input$trendIndicators == "OFF"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -785,21 +808,21 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = home_mean(),
                          linetype="Home"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = away_mean(),
                          linetype="Away"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -816,22 +839,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = home_mean(),
                          linetype="Home"), color = color3 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = away_mean(),
                          linetype="Away"), color = color4 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -852,22 +875,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = home_mean(),
                          linetype="Home"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = away_mean(),
                          linetype="Away"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -886,25 +909,25 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_home()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = home_mean(),
                          linetype="Home"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_away()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = away_mean(),
                          linetype="Away"), color = color6 , size = 1)}
     }
     
     else if(input$trendSplits == "Result"){
       
       if(input$trendIndicators == "OFF"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -918,21 +941,21 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat]),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat]),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat]),
+          geom_hline(aes(yintercept = wins_mean(),
                          linetype="Wins"), color = color1 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat]),
+          geom_hline(aes(yintercept = losses_mean(),
                          linetype="Losses"), color = color2 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -949,22 +972,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = wins_mean(),
                          linetype="Wins"), color = color1 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = losses_mean(),
                          linetype="Losses"), color = color2 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -985,22 +1008,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = wins_mean(),
                          linetype="Wins"), color = color1 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = losses_mean(),
                          linetype="Losses"), color = color2 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1019,25 +1042,25 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_wins()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = wins_mean(),
                          linetype="Wins"), color = color1 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_losses()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = losses_mean(),
                          linetype="Losses"), color = color2 , size = 1)}
     }
     
     else if(input$trendSplits == "NET"){
       
       if(input$trendIndicators == "OFF"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1051,21 +1074,21 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net50_mean(),
                          linetype="NET Top 50"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net100_mean(),
                          linetype="NET Top 100"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1082,22 +1105,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net50_mean(),
                          linetype="NET Top 50"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net100_mean(),
                          linetype="NET Top 100"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1118,22 +1141,22 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net50_mean(),
                          linetype="NET Top 50"), color = color3 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net100_mean(),
                          linetype="NET Top 100"), color = color4 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1152,25 +1175,25 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net50()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net50_mean(),
                          linetype="NET Top 50"), color = color5 , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_net100()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = net100_mean(),
                          linetype="NET Top 100"), color = color6 , size = 1)}
     }
     
     else if(input$trendSplits == "Conference"){
       
       if(input$trendIndicators == "OFF"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1184,19 +1207,19 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = "horizontal") +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = conf_mean(),
                          linetype="Conference Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Location"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1213,20 +1236,20 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "location"), shape = 18, size = 4) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = conf_mean(),
                          linetype="Conference Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "NET"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1247,20 +1270,20 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "net_rk", size = "net_rk"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = conf_mean(),
                          linetype="Conference Games"), color = color6 , size = 1)}
       
       else if(input$trendIndicators == "Conference"){
-        ggplot(data = Opp_Trends_df(), aes(x=reorder(game_code, date))) + 
+        ggplot(data = Opp_Trends_df_filtered(), aes(x=reorder(game_code, game_date))) + 
           annotate("rect", xmin=dec_min(), xmax=dec_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           annotate("rect", xmin=feb_min(), xmax=feb_max(), ymin=-Inf, ymax=Inf, 
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
-          scale_x_discrete(labels = Opp_Trends_df()$opponent) + 
+          scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
           xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
           scale_fill_manual(values = c("W" = color1, 
                                        "L" = color2)) +
@@ -1279,10 +1302,10 @@ server = function(input, output, session) {
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
                              legend.direction = 'horizontal') +
-          geom_hline(aes(yintercept = mean(Opp_Trends_df()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = mean(Opp_Trends_df_filtered()[,input$trendingStat], na.rm=T),
                          linetype="All Games"), color = "black" , size = 1) +
           geom_point(aes_string(y=input$trendingStat, colour = "conference_game", size = "conference_game"), shape = 18) +
-          geom_hline(aes(yintercept = mean(opp_game_stats_conf()[,input$trendingStat], na.rm=T),
+          geom_hline(aes(yintercept = conf_mean(),
                          linetype="Conference Games"), color = color3 , size = 1)}
     }
     )
