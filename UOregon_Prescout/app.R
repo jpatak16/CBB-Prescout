@@ -460,6 +460,15 @@ server = function(input, output, session) {
   feb_min = reactive(Opp_Trends_df_dates() %>% filter(month=="02") %>% arrange(day) %>% .[1,"game_num"] %>% as.numeric() %>% sum(-.5))
   feb_max = reactive(Opp_Trends_df_dates() %>% filter(month=="02") %>% arrange(desc(day)) %>% .[1,"game_num"] %>% as.numeric() %>% sum(.5))
   
+  #set min and maxs for y axis 
+  OO_ymin = reactive(ifelse(min(Opp_Trends_df_filtered()[,input$trendingStat]) >= 0,
+                            min(Opp_Trends_df_filtered()[,input$trendingStat]) - min(Opp_Trends_df_filtered()[,input$trendingStat]) * .15,
+                            min(Opp_Trends_df_filtered()[,input$trendingStat]) + min(Opp_Trends_df_filtered()[,input$trendingStat]) * .05))
+  
+  OO_ymax = reactive(ifelse(max(Opp_Trends_df_filtered()[,input$trendingStat]) >= 0,
+                            max(Opp_Trends_df_filtered()[,input$trendingStat]) + max(Opp_Trends_df_filtered()[,input$trendingStat]) * .05,
+                            max(Opp_Trends_df_filtered()[,input$trendingStat]) - max(Opp_Trends_df_filtered()[,input$trendingStat]) * .05))
+  
   output$OppTrends = renderPlot(
     
     if(input$trendSplits == "OFF"){
@@ -472,9 +481,10 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("pct", "%", gsub("_", " ", input$trendingStat))) +
+          xlab("") + ylab(gsub("pct", "%", gsub("_", " ", input$trendingStat))) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           guides(fill = guide_legend(title = NULL)) +
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
                              legend.position = "bottom",
@@ -488,11 +498,13 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) + 
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("Home" = color3,
-                                         "Away" = color4)) +
+                                         "Away" = color4),
+                              breaks = c("Home", "Away")) +
           guides(fill = guide_legend(title = NULL, order=1),
                  color = guide_legend(title = NULL, order=2)) +
           theme_bw() + theme(axis.text.x = element_cfb_logo(size=1.5),
@@ -508,11 +520,13 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("NET Top 50" = color3,
-                                         "NET Top 100" = color4)) +
+                                         "NET Top 100" = color4),
+                              breaks = c("NET Top 50", "NET Top 100")) +
           scale_size_manual(values = c("NET Top 50" = 4,
                                        "NET Top 100" = 4,
                                        "Other" = 0)) +
@@ -532,9 +546,10 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c(color3, color3),
                               limits = c(opp_conf())) +
           scale_size_manual(values = c(4), limits = c(opp_conf())) +
@@ -557,9 +572,10 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_linetype_manual(paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash")) +
           guides(fill = guide_legend(title = NULL, order=2),
@@ -578,11 +594,13 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("Home" = color3,
-                                         "Away" = color4)) +
+                                         "Away" = color4),
+                              breaks = c("Home", "Away")) +
           scale_linetype_manual(paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash")) +
           guides(fill = guide_legend(title = NULL, order=2),
@@ -603,11 +621,13 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("NET Top 50" = color3,
-                                         "NET Top 100" = color4)) +
+                                         "NET Top 100" = color4),
+                              breaks = c("NET Top 50", "NET Top 100")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash")) +
           scale_size_manual(values = c("NET Top 50" = 4,
@@ -632,9 +652,10 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c(color3, color3),
                               limits = c(opp_conf())) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
@@ -662,13 +683,15 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash", 
                                            "Last 5 Games" = "dashed",
-                                           "Last 10 Games" = "dashed")) +
+                                           "Last 10 Games" = "dashed"),
+                                breaks = c("All Games", "Last 5 Games", "Last 10 Games")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
                                          override.aes = list(colour=c("black", color5, color6)))) +
@@ -690,15 +713,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("Home" = color3,
-                                         "Away" = color4)) +
+                                         "Away" = color4),
+                              breaks = c("Home", "Away")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Last 5 Games" = "dashed",
-                                           "Last 10 Games" = "dashed")) +
+                                           "Last 10 Games" = "dashed"),
+                                breaks = c("All Games", "Last 5 Games", "Last 10 Games")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
                  linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
@@ -722,15 +748,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("NET Top 50" = color3,
-                                         "NET Top 100" = color4)) +
+                                         "NET Top 100" = color4),
+                              breaks = c("NET Top 50", "NET Top 100")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Last 5 Games" = "dashed",
-                                           "Last 10 Games" = "dashed")) +
+                                           "Last 10 Games" = "dashed"),
+                                breaks = c("All Games", "Last 5 Games", "Last 10 Games")) +
           scale_size_manual(values = c("NET Top 50" = 4,
                                        "NET Top 100" = 4,
                                        "Other" = 0)) +
@@ -758,15 +787,17 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c(color3, color3),
                               limits = c(opp_conf())) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Last 5 Games" = "dashed",
-                                           "Last 10 Games" = "dashed")) +
+                                           "Last 10 Games" = "dashed"),
+                                breaks = c("All Games", "Last 5 Games", "Last 10 Games")) +
           scale_size_manual(values = c(4), limits = c(opp_conf())) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
@@ -795,13 +826,15 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash", 
                                            "Home" = "dashed",
-                                           "Away" = "dashed")) +
+                                           "Away" = "dashed"),
+                                breaks = c("All Games", "Home", "Away")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
                                          override.aes = list(colour=c("black", color5, color6)))) +
@@ -823,15 +856,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("Home" = color3,
-                                         "Away" = color4)) +
+                                         "Away" = color4),
+                              breaks = c("Home", "Away")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Home" = "dashed",
-                                           "Away" = "dashed")) +
+                                           "Away" = "dashed"),
+                                breaks = c("All Games", "Home", "Away")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
                  linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
@@ -855,15 +891,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("NET Top 50" = color3,
-                                         "NET Top 100" = color4)) +
+                                         "NET Top 100" = color4),
+                              breaks = c("NET Top 50", "NET Top 100")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Home" = "dashed",
-                                           "Away" = "dashed")) +
+                                           "Away" = "dashed"),
+                                breaks = c("All Games", "Home", "Away")) +
           scale_size_manual(values = c("NET Top 50" = 4,
                                        "NET Top 100" = 4,
                                        "Other" = 0)) +
@@ -891,15 +930,17 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c(color3, color3),
                               limits = c(opp_conf())) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Home" = "dashed",
-                                           "Away" = "dashed")) +
+                                           "Away" = "dashed"),
+                                breaks = c("All Games", "Home", "Away")) +
           scale_size_manual(values = c(4), limits = c(opp_conf())) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
@@ -928,13 +969,15 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash", 
                                            "Wins" = "dashed",
-                                           "Losses" = "dashed")) +
+                                           "Losses" = "dashed"),
+                                breaks = c("All Games", "Wins", "Losses")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
                                          override.aes = list(colour=c("black", color1, color2)))) +
@@ -956,15 +999,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("Home" = color3,
-                                         "Away" = color4)) +
+                                         "Away" = color4),
+                              breaks = c("Home", "Away")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Wins" = "dashed",
-                                           "Losses" = "dashed")) +
+                                           "Losses" = "dashed"),
+                                breaks = c("All Games", "Wins", "Losses")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
                  linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
@@ -988,15 +1034,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("NET Top 50" = color3,
-                                         "NET Top 100" = color4)) +
+                                         "NET Top 100" = color4),
+                              breaks = c("NET Top 50", "NET Top 100")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Wins" = "dashed",
-                                           "Losses" = "dashed")) +
+                                           "Losses" = "dashed"),
+                                breaks = c("All Games", "Wins", "Losses")) +
           scale_size_manual(values = c("NET Top 50" = 4,
                                        "NET Top 100" = 4,
                                        "Other" = 0)) +
@@ -1024,15 +1073,17 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c(color3, color3),
                               limits = c(opp_conf())) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Wins" = "dashed",
-                                           "Losses" = "dashed")) +
+                                           "Losses" = "dashed"),
+                                breaks = c("All Games", "Wins", "Losses")) +
           scale_size_manual(values = c(4), limits = c(opp_conf())) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
@@ -1061,13 +1112,15 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash", 
                                            "NET Top 50" = "dashed",
-                                           "NET Top 100" = "dashed")) +
+                                           "NET Top 100" = "dashed"),
+                                breaks = c("All Games", "NET Top 50", "NET Top 100")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  linetype = guide_legend(keywidth = 3, title.position = "top", title.hjust = .5, order=1,
                                          override.aes = list(colour=c("black", color5, color6)))) +
@@ -1089,15 +1142,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("Home" = color3,
-                                         "Away" = color4)) +
+                                         "Away" = color4),
+                              breaks = c("Home", "Away")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "NET Top 50" = "dashed",
-                                           "NET Top 100" = "dashed")) +
+                                           "NET Top 100" = "dashed"),
+                                breaks = c("All Games", "NET Top 50", "NET Top 100")) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
                  linetype = guide_legend(keywidth = 5, title.position = "top", title.hjust = .5, order=1,
@@ -1121,15 +1177,18 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("NET Top 50" = color3,
-                                         "NET Top 100" = color4)) +
+                                         "NET Top 100" = color4),
+                              breaks = c("NET Top 50", "NET Top 100")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "NET Top 50" = "dashed",
-                                           "NET Top 100" = "dashed")) +
+                                           "NET Top 100" = "dashed"),
+                                breaks = c("All Games", "NET Top 50", "NET Top 100")) +
           scale_size_manual(values = c("NET Top 50" = 4,
                                        "NET Top 100" = 4,
                                        "Other" = 0)) +
@@ -1157,15 +1216,17 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c(color3, color3),
                               limits = c(opp_conf())) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "NET Top 50" = "dashed",
-                                           "NET Top 100" = "dashed")) +
+                                           "NET Top 100" = "dashed"),
+                                breaks = c("All Games", "NET Top 50", "NET Top 100")) +
           scale_size_manual(values = c(4), limits = c(opp_conf())) +
           guides(fill = guide_legend(title = NULL, order=2),
                  color = guide_legend(title = NULL, order=3),
@@ -1194,9 +1255,10 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash", 
                                            "Conference Games" = "dashed"),
@@ -1220,11 +1282,13 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("Home" = color3,
-                                         "Away" = color4)) +
+                                         "Away" = color4),
+                              breaks = c("Home", "Away")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Conference Games" = "dashed"),
@@ -1250,11 +1314,13 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c("NET Top 50" = color3,
-                                         "NET Top 100" = color4)) +
+                                         "NET Top 100" = color4),
+                              breaks = c("NET Top 50", "NET Top 100")) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
                                 values = c("All Games" = "longdash",
                                            "Conference Games" = "dashed"),
@@ -1284,9 +1350,10 @@ server = function(input, output, session) {
                    fill="grey", alpha = .3) +
           geom_col(aes_string(y = input$trendingStat, fill = "wl")) +
           scale_x_discrete(labels = Opp_Trends_df_filtered()$opponent) + 
-          xlab("") + ylab(gsub("_", " ", input$trendingStat)) +
+          xlab("") + ylab(gsub("_", " ", input$trendingStat)) + coord_cartesian(ylim = c(OO_ymin(), OO_ymax())) +
           scale_fill_manual(values = c("W" = color1, 
-                                       "L" = color2)) +
+                                       "L" = color2),
+                            breaks = c("W", "L")) +
           scale_colour_manual(values = c(color3, color3),
                               limits = c(opp_conf())) +
           scale_linetype_manual(name = paste0("Average ", gsub("_", " ", input$trendingStat)), 
