@@ -3,7 +3,7 @@ p_load(tidyverse, janitor, cfbplotR, stringr, readxl, hoopR, toRvik, rvest)
 
 our_team = "Oregon"
 opponentList = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
-opponentSRurl_db = read_xlsx("UOregon_Prescout/opp_url.xlsx")
+opponentSRurl_db = read.csv("UOregon_Prescout/data/opp_url.csv")
 year=2023
 
 OO_TrendStat_List = c("Winning Margin" = "Winning_Margin", 
@@ -87,21 +87,21 @@ colnames(advanced_defense)= c(colnames(advanced_defense[,1:7]), paste("defense_"
 Sys.sleep(15)
 
 #put all tables into one 
-SR_team_stats = left_join(basic_offense, basic_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
-SR_team_stats = left_join(SR_team_stats, advanced_offense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
-SR_team_stats = left_join(SR_team_stats, advanced_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
+SR_team_stats = left_join(basic_offense, basic_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos")) %>%
+  left_join(advanced_offense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos")) %>%
+  left_join(advanced_defense, by=c("school", "g", "w", "l", "w_l_percent", "srs", "sos"))
 
 rm(advanced_offense, advanced_defense, basic_offense, basic_defense, advanced_offense_url, advanced_defense_url, basic_offense_url, basic_defense_url)
 
-#convert stats into usable numeric stats
-for(c in 2:67){SR_team_stats[,c] = SR_team_stats[,c] %>% as.numeric()}; rm(c)
 
-#make all stats we want using other stats
-SR_team_stats = SR_team_stats %>% mutate(offense_x2p_percent = (offense_fg - offense_x3p)/(offense_fga - offense_x3pa),
-                                         offense_drb_percent = 100 - defense_orb_percent)
-
-#standardize school names
-SR_team_stats = SR_team_stats %>% mutate(school = clean_school_names(school))
+SR_team_stats = SR_team_stats %>%
+  #columns into numeric
+  mutate(across(2:67, as.numeric)) %>%
+  #make all stats we want using other stats
+  mutate(offense_x2p_percent = (offense_fg - offense_x3p)/(offense_fga - offense_x3pa),
+                                         offense_drb_percent = 100 - defense_orb_percent) %>%
+  #standardize school names
+  mutate(school = clean_school_names(school))
 
 #pull team groups that will be in GMC
 our_schedule = kp_team_schedule(our_team, year=year) %>% select(opponent) %>% 
@@ -178,14 +178,10 @@ for(c in 2:ncol(SR_team_stats)){
   GMC_medians[1,c-1] = median(a)
 }
 colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
-rm(a, c, all_graphic_info, graphic_info_AP, graphic_info_NET)
 
 #read headshot url table
-headshot_urls_db = read_xlsx("UOregon_Prescout/headshot_url.xlsx") %>%
+headshot_urls_db = read.csv("UOregon_Prescout/data/headshot_url.csv") %>%
   mutate(URL = ifelse(is.na(URL), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
-
-
-
 
 #write the data to file
 write.csv(GMC_AP, file = "UOregon_Prescout/data/GMC_AP.csv", row.names = FALSE)
@@ -194,7 +190,7 @@ write.csv(GMC_NET, file = "UOregon_Prescout/data/GMC_NET.csv", row.names = FALSE
 write.csv(GMC_medians, file = "UOregon_Prescout/data/GMC_medians.csv", row.names = FALSE)
 write.csv(graphic_info_OS, file = "UOregon_Prescout/data/graphic_info_OS.csv", row.names = FALSE)
 
-
+rm(SR_team_stats, AP_top25, NET_top50, our_schedule, a, c, all_graphic_info, graphic_info_AP, graphic_info_NET)
 
 #write a function that will standardize a player's name
 standardize_name = function(player_name){
@@ -214,16 +210,15 @@ standardize_name = Vectorize(standardize_name)
 
 
 
-#opponent specific data
+###### data for PPT, OO splits, and Opp trends
+###### looped by team
 
-#list of teams that we will pull data for
-data_needed_for = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
 #empty df to populate
 PPT_data = data.frame()
 OO_splits_data = data.frame()
 Opp_Trends_df = data.frame()
 
-for(opp in data_needed_for){
+for(opp in opponentList){
   #SR data
   opponentSRurl = opponentSRurl_db %>% filter(opponent == opp) %>% .[[1,2]]
   SRopponentTables = read_html(opponentSRurl) %>% html_table()
@@ -502,14 +497,217 @@ for(opp in data_needed_for){
   Sys.sleep(30)
 }
 
+
 write.csv(PPT_data, file = "UOregon_Prescout/data/PPT_data.csv", row.names = FALSE)
 write.csv(OO_splits_data, file = "UOregon_Prescout/data/OO_splits_data.csv", row.names = FALSE)
 write.csv(Opp_Trends_df, file = "UOregon_Prescout/data/Opp_Trends_df.csv", row.names = FALSE)
 
-
 rm(df, headshots_PPT, kp_pos, KP_PPT, KP2_PPT, lastGstarters, OO_trend_per_stat, opp_game_stats, opp_game_stats_away,
    opp_game_stats_conf, opp_game_stats_home, opp_game_stats_losses, opp_game_stats_net100, opp_game_stats_net50, 
    opp_game_stats_recency10, opp_game_stats_recency5, opp_game_stats_wins, opp_gp_stats, opp_spreads, Opp_Trends_df_team, pos_c,
-   pos_pf, pos_pg, pos_sf, pos_sg, PPT_data_temp, SR_PPT, SR_team_stats, SR2_PPT, SR3_PPT, lastGdate, opp, opp_conf, opp_id,
-   opponentGID, opponentSRurl, r, stat)
+   pos_pf, pos_pg, pos_sf, pos_sg, PPT_data_temp, SR_PPT, SR2_PPT, SR3_PPT, lastGdate, opp, opp_conf, opp_id,
+   opponentGID, opponentSRurl, r, stat, opponent_kp)
+
+###### player comp data
+player_totals_url = 'https://www.sports-reference.com/cbb/play-index/psl_finder.cgi?request=1&match=single&year_min=2023&year_max=2023&conf_id=&school_id=&class_is_fr=Y&class_is_so=Y&class_is_jr=Y&class_is_sr=Y&pos_is_g=Y&pos_is_f=Y&pos_is_c=Y&games_type=A&qual=&c1stat=&c1comp=gt&c1val=&c2stat=&c2comp=gt&c2val=&c3stat=&c3comp=gt&c3val=&c4stat=&c4comp=gt&c4val=&order_by=pts&order_by_asc=&offset='
+offset = seq(0, 6000, by = 100)
+
+player_totals = data.frame()
+for(num in offset){
+  pt_url = paste0(player_totals_url, num)
+  raw_pt = read_html(pt_url) %>% html_table()
+  if(length(raw_pt) == 0){break}
+  player_totals_partial = raw_pt %>% .[[1]] %>% as.data.frame() %>%
+    row_to_names(row_number = 1, remove_row = T) %>% clean_names() %>%
+    filter(rk != "") %>% filter(rk != "Rk")
+  player_totals = rbind(player_totals, player_totals_partial)
+  Sys.sleep(30)
+}
+player_totals = player_totals %>% unique() %>% select(-rk)
+
+#scrape ncaa box score advanced
+player_advanced_url = 'https://www.sports-reference.com/cbb/play-index/psl_finder.cgi?request=1&match=single&year_min=2023&year_max=2023&conf_id=&school_id=&class_is_fr=Y&class_is_so=Y&class_is_jr=Y&class_is_sr=Y&pos_is_g=Y&pos_is_f=Y&pos_is_c=Y&games_type=A&qual=&c1stat=&c1comp=gt&c1val=&c2stat=&c2comp=gt&c2val=&c3stat=&c3comp=gt&c3val=&c4stat=&c4comp=gt&c4val=&order_by=per&order_by_asc=&offset='
+
+player_advanced = data.frame()
+for(num in offset){
+  pa_url = paste0(player_advanced_url, num)
+  raw_pa = read_html(pa_url) %>% html_table()
+  if(length(raw_pa) == 0){break}
+  player_advanced_partial = raw_pa %>% .[[1]] %>% as.data.frame() %>%
+    row_to_names(row_number = 1, remove_row = T) %>% clean_names() %>%
+    filter(rk != "") %>% filter(rk != "Rk")
+  player_advanced = rbind(player_advanced, player_advanced_partial)
+  Sys.sleep(30)
+}
+player_advanced = player_advanced %>% unique() %>% select(-rk)
+
+ncaa_player_stats = player_totals %>% full_join(player_advanced) %>%
+  mutate_at(vars('g':'bpm'), as.numeric) %>%
+  select(-c('season', 'conf', 'p_prod')) %>%
+  rename(team = school)
+
+#load in a saved dataset of nba total and advanced stats
+nba_player_stats = read.csv("UOregon_Prescout/data/nba_stats.csv") %>%
+  clean_names() %>% 
+  mutate(class = 'NBA') %>%
+  #match names to ncaa table
+  select(player, class, pos, team, g, mp, fg, fga, fg_percent=fg_2, x2p, x2pa, x3p, x3pa, x3p_percent=x3p_2, ft, fta, ft_percent=ft_2,
+         orb, drb, trb, ast, stl, blk, tov, pf, pts, per, ts_percent=ts, e_fg_percent=e_fg, orb_percent=orb_2, drb_percent=drb_2, 
+         trb_percent=trb_2, ast_percent=ast_2, stl_percent=stl_2, blk_percent=blk_2, tov_percent=tov_2, usg_percent=usg, o_rtg,
+         d_rtg, ows, dws, ws, obpm, dbpm, bpm)
+
+#join nba and ncaa tables together
+all_player_stats = rbind(ncaa_player_stats, nba_player_stats) %>%
+  filter((class=="NBA" & g>=10 & mp>=400) | (class!="NBA" & g>=7 & mp>=150)) %>%
+  mutate(x3p_percent = ifelse(is.na(x3p_percent), 0, x3p_percent))
+
+#in the future, this is where I will add a part to change some listed player positions
+
+#separate positions into three groups
+guard_stats = all_player_stats %>% filter(pos=='G' | pos=='G-F')
+wing_stats = all_player_stats %>% filter(pos=='F' | pos=='F-G')
+big_stats = all_player_stats %>% filter(pos=='C' | pos=='C-F' | pos=='F-C')
+
+#calculate play styles and percentiles for each league and each position
+nba_guard_styles = guard_stats %>% 
+  filter(class=="NBA") %>%
+  mutate(x3_p_s = (x3p * 3)/pts + x3p_percent + (x3pa/mp),
+         slasher = (x2pa/fga) + (fta/fga),
+         ball_dominant = usg_percent,
+         playmaker = ast_percent - .5*(usg_percent),
+         limit_to = tov/mp - .5*(ast/mp),
+         dbpm_pct = percent_rank(dbpm),
+         perim_defender = dbpm_pct/2 + stl_percent/10,
+         oreb = orb_percent,
+         dreb = drb_percent,
+         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, oreb, dreb, 
+         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+  mutate_if(is.numeric, percent_rank) %>%
+  mutate(limit_to = (limit_to - 1)* -1)
+
+ncaa_guard_styles = guard_stats %>% 
+  filter(class!="NBA") %>%
+  mutate(x3_p_s = (x3p * 3)/pts + x3p_percent + (x3pa/mp),
+         slasher = (x2pa/fga) + (fta/fga),
+         ball_dominant = usg_percent,
+         playmaker = ast_percent - .5*(usg_percent),
+         limit_to = tov/mp - .5*(ast/mp),
+         dbpm_pct = percent_rank(dbpm),
+         perim_defender = dbpm_pct/2 + stl_percent/10,
+         oreb = orb_percent,
+         dreb = drb_percent,
+         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, oreb, dreb,
+         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+  mutate_if(is.numeric, percent_rank) %>%
+  mutate(limit_to = (limit_to - 1)* -1) %>%
+  filter(team %in% opponentList | team == "Connecticut" )
+
+nba_wing_styles = wing_stats %>% 
+  filter(class=="NBA") %>%
+  mutate(x3_p_s = (x3p * 3)/pts + x3p_percent + (x3pa/mp),
+         slasher = (x2pa/fga) + (fta/fga),
+         ball_dominant = usg_percent,
+         playmaker = ast_percent - .5*(usg_percent),
+         limit_to = tov/mp - .5*(ast/mp),
+         dbpm_pct = percent_rank(dbpm),
+         perim_defender = dbpm_pct/2 + stl_percent/10,
+         rim_protector = dbpm_pct/2 + blk_percent/10,
+         oreb = orb_percent,
+         dreb = drb_percent,
+         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, rim_protector, oreb, dreb,
+         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+  mutate_if(is.numeric, percent_rank) %>%
+  mutate(limit_to = (limit_to - 1)* -1)
+
+ncaa_wing_styles = wing_stats %>% 
+  filter(class!="NBA") %>%
+  mutate(x3_p_s = (x3p * 3)/pts + x3p_percent + (x3pa/mp),
+         slasher = (x2pa/fga) + (fta/fga),
+         ball_dominant = usg_percent,
+         playmaker = ast_percent - .5*(usg_percent),
+         limit_to = tov/mp - .5*(ast/mp),
+         dbpm_pct = percent_rank(dbpm),
+         perim_defender = dbpm_pct/2 + stl_percent/10,
+         rim_protector = dbpm_pct/2 + blk_percent/10,
+         oreb = orb_percent,
+         dreb = drb_percent,
+         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, rim_protector, oreb, dreb,
+         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+  mutate_if(is.numeric, percent_rank) %>%
+  mutate(limit_to = (limit_to - 1)* -1) %>%
+  filter(team %in% opponentList | team == "Connecticut" )
+
+nba_big_styles = big_stats %>% 
+  filter(class=="NBA") %>%
+  mutate(stretch_big = (x3p * 3)/pts + x3p_percent + (x3pa/mp),
+         draws_fouls = (fta/fga),
+         passing_big = ast_percent,
+         limit_to = tov/mp - .5*(ast/mp),
+         dbpm_pct = percent_rank(dbpm),
+         rim_protector = dbpm_pct/2 + blk_percent/10,
+         oreb = orb_percent,
+         dreb = drb_percent,
+         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, class, pos, team, stretch_big, draws_fouls, passing_big, limit_to, rim_protector, oreb, dreb,
+         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+  mutate_if(is.numeric, percent_rank) %>%
+  mutate(limit_to = (limit_to - 1)* -1)
+
+ncaa_big_styles = big_stats %>% 
+  filter(class!="NBA") %>%
+  mutate(stretch_big = (x3p * 3)/pts + x3p_percent + (x3pa/mp),
+         draws_fouls = (fta/fga),
+         passing_big = ast_percent,
+         limit_to = tov/mp - .5*(ast/mp),
+         dbpm_pct = percent_rank(dbpm),
+         rim_protector = dbpm_pct/2 + blk_percent/10,
+         oreb = orb_percent,
+         dreb = drb_percent,
+         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, class, pos, team, stretch_big, draws_fouls, passing_big, limit_to, rim_protector, oreb, dreb,
+         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+  mutate_if(is.numeric, percent_rank) %>%
+  mutate(limit_to = (limit_to - 1)* -1) %>%
+  filter(team %in% opponentList | team == "Connecticut")
+
+styles_list = list(list(ncaa_guard_styles, nba_guard_styles), 
+                   list(ncaa_wing_styles, nba_wing_styles), 
+                   list(ncaa_big_styles, nba_big_styles))
+
+#maybe do PCA first
+
+#for the desired ncaa athletes, find their most alike nba comparison
+sim_list = list(); z=1
+for(a in styles_list){
+  n_ncaa_players = nrow(a[[1]])
+  for(player in 1:n_ncaa_players){
+    similarity_vec = dist(rbind(a[[1]][player,], a[[2]]))[1:nrow(a[[2]])]
+    top_5 = head(order(similarity_vec), 5)
+    top_5 = a[[2]][top_5, 'player']
+    a[[1]][player, 'sim_1'] = top_5[1]
+    a[[1]][player, 'sim_2'] = top_5[2]
+    a[[1]][player, 'sim_3'] = top_5[3]
+    a[[1]][player, 'sim_4'] = top_5[4]
+    a[[1]][player, 'sim_5'] = top_5[5]
+  }
+  sim_list[[z]] = a
+  z = z+1
+}
+
+write.csv(sim_list[[1]][1], file = "UOregon_Prescout/data/ncaa_guard_sim.csv", row.names = FALSE)
+write.csv(sim_list[[2]][1], file = "UOregon_Prescout/data/ncaa_wing_sim.csv", row.names = FALSE)
+write.csv(sim_list[[3]][1], file = "UOregon_Prescout/data/ncaa_big_sim.csv", row.names = FALSE)
+
+
+rm(a, all_player_stats, big_stats, guard_stats, nba_big_styles, nba_guard_styles, nba_player_stats, nba_wing_styles, ncaa_big_styles,
+   ncaa_guard_styles, ncaa_player_stats, ncaa_wing_styles, raw_pa, raw_pt, player_totals_partial, player_advanced_partial, 
+   num, offset, pa_url, pt_url, player_advanced_url, player_totals_url, player_advanced, player_totals, wing_stats, n_ncaa_players,
+   player, similarity_vec, top_5, z)
+
+
+
 
