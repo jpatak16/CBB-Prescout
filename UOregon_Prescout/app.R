@@ -64,7 +64,7 @@ color5 = "#ff7518"
 color6 = "#9300ff"
 
 #read headshot url table
-headshot_urls_db = read_xlsx("headshot_url.xlsx") %>%
+headshot_urls_db = read_xlsx("data/headshot_url.xlsx") %>%
   mutate(URL = ifelse(is.na(URL), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
 
 
@@ -115,7 +115,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(2, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
                                   column(6, radioButtons("trendSplits", "Average By Splits", OO_TrendSplit_List, inline = T)),
                                   column(4, radioButtons("trendIndicators", "Indicators", OO_TrendIndicator_List, inline = T)),
-                                  column(12, plotOutput("OppTrends", height = "350px"))
+                                  column(12, plotOutput("OppTrends", height = "600px"))
                                   ) #end of Opp Trends fluidRow 
                          ), #end of OO tabPanel
                 
