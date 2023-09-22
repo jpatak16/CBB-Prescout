@@ -181,7 +181,7 @@ colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
 
 #read headshot url table
 headshot_urls_db = read.csv("UOregon_Prescout/data/headshot_url.csv") %>%
-  mutate(URL = ifelse(is.na(URL), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
+  mutate(URL = ifelse(URL == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
 
 #write the data to file
 write.csv(GMC_AP, file = "UOregon_Prescout/data/GMC_AP.csv", row.names = FALSE)
@@ -298,10 +298,10 @@ for(opp in opponentList){
     mutate(G = ifelse(!is.na(G), G, 0),
            MPG = ifelse(!is.na(MPG), MPG, 0),
            "AST:TO" = round(ApG / TOV, 2)) %>%
-    select(-starter, -player_join) %>%
+    select(-starter) %>%
     separate(Player.x, into = c('first', 'last'), sep = "[^\\w'.-]", extra = 'merge') %>%
     #order columns into the order I want them to appear in the PPT
-    select("#", URL, first, last, Team, 
+    select("#", player_join, URL, first, last, Team, 
            Class=yr, Pos, Height=ht, Weight=wt, 
            GP=G, GS, MPG, "Poss%"=poss_pct, "USG%",
            PG, SG, SF, PF, C,
@@ -498,7 +498,7 @@ for(opp in opponentList){
 }
 
 
-write.csv(PPT_data, file = "UOregon_Prescout/data/PPT_data.csv", row.names = FALSE)
+write.csv(PPT_data %>% select(-player_join), file = "UOregon_Prescout/data/PPT_data.csv", row.names = FALSE)
 write.csv(OO_splits_data, file = "UOregon_Prescout/data/OO_splits_data.csv", row.names = FALSE)
 write.csv(Opp_Trends_df, file = "UOregon_Prescout/data/Opp_Trends_df.csv", row.names = FALSE)
 
@@ -559,7 +559,9 @@ nba_player_stats = read.csv("UOregon_Prescout/data/nba_stats.csv") %>%
 #join nba and ncaa tables together
 all_player_stats = rbind(ncaa_player_stats, nba_player_stats) %>%
   filter((class=="NBA" & g>=10 & mp>=400) | (class!="NBA" & g>=7 & mp>=150)) %>%
-  mutate(x3p_percent = ifelse(is.na(x3p_percent), 0, x3p_percent))
+  mutate(x3p_percent = ifelse(is.na(x3p_percent), 0, x3p_percent)) %>%
+  arrange(desc(mp)) %>%
+  mutate(player_join = standardize_name(player))
 
 #in the future, this is where I will add a part to change some listed player positions
 
@@ -580,9 +582,9 @@ nba_guard_styles = guard_stats %>%
          perim_defender = dbpm_pct/2 + stl_percent/10,
          oreb = orb_percent,
          dreb = drb_percent,
-         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
-  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, oreb, dreb, 
-         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+         sim_1=NA, sim_1_url=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, player_join, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, oreb, dreb, 
+         sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5) %>%
   mutate_if(is.numeric, percent_rank) %>%
   mutate(limit_to = (limit_to - 1)* -1)
 
@@ -597,9 +599,9 @@ ncaa_guard_styles = guard_stats %>%
          perim_defender = dbpm_pct/2 + stl_percent/10,
          oreb = orb_percent,
          dreb = drb_percent,
-         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
-  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, oreb, dreb,
-         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+         sim_1=NA, sim_1_url = NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, player_join, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, oreb, dreb,
+         sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5) %>%
   mutate_if(is.numeric, percent_rank) %>%
   mutate(limit_to = (limit_to - 1)* -1) %>%
   filter(team %in% opponentList | team == "Connecticut" )
@@ -616,9 +618,9 @@ nba_wing_styles = wing_stats %>%
          rim_protector = dbpm_pct/2 + blk_percent/10,
          oreb = orb_percent,
          dreb = drb_percent,
-         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
-  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, rim_protector, oreb, dreb,
-         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+         sim_1=NA, sim_1_url = NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, player_join, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, rim_protector, oreb, dreb,
+         sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5) %>%
   mutate_if(is.numeric, percent_rank) %>%
   mutate(limit_to = (limit_to - 1)* -1)
 
@@ -634,9 +636,9 @@ ncaa_wing_styles = wing_stats %>%
          rim_protector = dbpm_pct/2 + blk_percent/10,
          oreb = orb_percent,
          dreb = drb_percent,
-         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
-  select(player, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, rim_protector, oreb, dreb,
-         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+         sim_1=NA, sim_1_url = NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, player_join, class, pos, team, x3_p_s, slasher, ball_dominant, playmaker, limit_to, perim_defender, rim_protector, oreb, dreb,
+         sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5) %>%
   mutate_if(is.numeric, percent_rank) %>%
   mutate(limit_to = (limit_to - 1)* -1) %>%
   filter(team %in% opponentList | team == "Connecticut" )
@@ -651,9 +653,9 @@ nba_big_styles = big_stats %>%
          rim_protector = dbpm_pct/2 + blk_percent/10,
          oreb = orb_percent,
          dreb = drb_percent,
-         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
-  select(player, class, pos, team, stretch_big, draws_fouls, passing_big, limit_to, rim_protector, oreb, dreb,
-         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+         sim_1=NA, sim_1_url = NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, player_join, class, pos, team, stretch_big, draws_fouls, passing_big, limit_to, rim_protector, oreb, dreb,
+         sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5) %>%
   mutate_if(is.numeric, percent_rank) %>%
   mutate(limit_to = (limit_to - 1)* -1)
 
@@ -667,9 +669,9 @@ ncaa_big_styles = big_stats %>%
          rim_protector = dbpm_pct/2 + blk_percent/10,
          oreb = orb_percent,
          dreb = drb_percent,
-         sim_1=NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
-  select(player, class, pos, team, stretch_big, draws_fouls, passing_big, limit_to, rim_protector, oreb, dreb,
-         sim_1, sim_2, sim_3, sim_4, sim_5) %>%
+         sim_1=NA, sim_1_url = NA, sim_2=NA, sim_3=NA, sim_4=NA, sim_5=NA) %>%
+  select(player, player_join, class, pos, team, stretch_big, draws_fouls, passing_big, limit_to, rim_protector, oreb, dreb,
+         sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5) %>%
   mutate_if(is.numeric, percent_rank) %>%
   mutate(limit_to = (limit_to - 1)* -1) %>%
   filter(team %in% opponentList | team == "Connecticut")
@@ -685,10 +687,17 @@ sim_list = list(); z=1
 for(a in styles_list){
   n_ncaa_players = nrow(a[[1]])
   for(player in 1:n_ncaa_players){
-    similarity_vec = dist(rbind(a[[1]][player,], a[[2]]))[1:nrow(a[[2]])]
+    similarity_vec = dist(rbind(a[[1]][player,] %>% select(-c(player, player_join, class, pos, team, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)) , 
+                                a[[2]] %>% select(-c(player, player_join, class, pos, team, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5))))[1:nrow(a[[2]])]
     top_5 = head(order(similarity_vec), 5)
     top_5 = a[[2]][top_5, 'player']
     a[[1]][player, 'sim_1'] = top_5[1]
+    sim_1_url = hoopR::nba_playerheadshot(player_id = 
+                                            (hoopR::nba_commonallplayers()$CommonAllPlayers %>% as.data.frame() %>% 
+                                               filter(DISPLAY_FIRST_LAST == top_5[1] %>% unlist()) %>% 
+                                               select(PERSON_ID) %>% unlist() %>% as.character()))
+    Sys.sleep(10)
+    a[[1]][player, 'sim_1_url'] = sim_1_url
     a[[1]][player, 'sim_2'] = top_5[2]
     a[[1]][player, 'sim_3'] = top_5[3]
     a[[1]][player, 'sim_4'] = top_5[4]
@@ -698,15 +707,23 @@ for(a in styles_list){
   z = z+1
 }
 
-write.csv(sim_list[[1]][1], file = "UOregon_Prescout/data/ncaa_guard_sim.csv", row.names = FALSE)
-write.csv(sim_list[[2]][1], file = "UOregon_Prescout/data/ncaa_wing_sim.csv", row.names = FALSE)
-write.csv(sim_list[[3]][1], file = "UOregon_Prescout/data/ncaa_big_sim.csv", row.names = FALSE)
+ncaa_guard_sim = sim_list[[1]][[1]] %>% left_join(PPT_data %>% select(player_join, URL, '#'), by = "player_join") %>% select(-player_join)
+ncaa_wing_sim = sim_list[[2]][[1]] %>% left_join(PPT_data %>% select(player_join, URL, '#'), by = "player_join") %>% select(-player_join)
+ncaa_big_sim = sim_list[[3]][[1]] %>% left_join(PPT_data %>% select(player_join, URL, '#'), by = "player_join") %>% select(-player_join)
 
+
+write.csv(ncaa_guard_sim, file = "UOregon_Prescout/data/ncaa_guard_sim.csv", row.names = FALSE)
+write.csv(ncaa_wing_sim, file = "UOregon_Prescout/data/ncaa_wing_sim.csv", row.names = FALSE)
+write.csv(ncaa_big_sim, file = "UOregon_Prescout/data/ncaa_big_sim.csv", row.names = FALSE)
+
+write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "UOregon_Prescout/data/nba_guard_style.csv", row.names = FALSE)
+write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "UOregon_Prescout/data/nba_wing_style.csv", row.names = FALSE)
+write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "UOregon_Prescout/data/nba_big_style.csv", row.names = FALSE)
 
 rm(a, all_player_stats, big_stats, guard_stats, nba_big_styles, nba_guard_styles, nba_player_stats, nba_wing_styles, ncaa_big_styles,
    ncaa_guard_styles, ncaa_player_stats, ncaa_wing_styles, raw_pa, raw_pt, player_totals_partial, player_advanced_partial, 
    num, offset, pa_url, pt_url, player_advanced_url, player_totals_url, player_advanced, player_totals, wing_stats, n_ncaa_players,
-   player, similarity_vec, top_5, z)
+   player, similarity_vec, top_5, z, styles_list)
 
 
 
