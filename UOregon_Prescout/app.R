@@ -1,6 +1,6 @@
 library(shiny)
 library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, hoopR, paletteer, toRvik, ggtext, readxl)
+p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, hoopR, paletteer, toRvik, ggtext, readxl, fmsb, scales)
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
@@ -16,6 +16,14 @@ graphic_info_OS = read.csv("data/graphic_info_OS.csv")
 PPT_data = read.csv("data/PPT_data.csv", check.names = FALSE)
 OO_splits_data = read.csv("data/OO_splits_data.csv")
 Opp_Trends_df = read.csv("data/Opp_Trends_df.csv")
+nba_stats = read.csv("data/nba_stats.csv")
+ncaa_guard_sim = read.csv("data/ncaa_guard_sim.csv")
+ncaa_wing_sim = read.csv("data/ncaa_wing_sim.csv", colClasses = c("pos"="character"))
+ncaa_big_sim = read.csv("data/ncaa_big_sim.csv")
+nba_big_style = read.csv("data/nba_big_style.csv")
+nba_wing_style = read.csv("data/nba_wing_style.csv")
+nba_guard_style = read.csv("data/nba_guard_style.csv")
+
 
 #the list of options for our metric comparison plots
 MetricCompList = c("ORTG x DRTG", "2P% x 3P%", "3PAR x 3P%", "AST% x TOV%", "STL% x BLK%", "OREB% x DREB%")
@@ -63,16 +71,13 @@ color4 = "#0096ff"
 color5 = "#ff7518"
 color6 = "#9300ff"
 
-#read headshot url table
-headshot_urls_db = read_xlsx("data/headshot_url.xlsx") %>%
-  mutate(URL = ifelse(is.na(URL), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
 
 
 
 
 
-
-ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
+ui = navbarPage("Pre-Scout Portal", fluid = TRUE, 
+                tags$head(tags$style('ul.nav-pills{display: flex !important;justify-content: center !important; padding-bottom: 50px;}')),
                 tabPanel("Matchup Selection", 
                          fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
                                   column(6, h1(strong("Pre-Scout Portal")), uiOutput("header")),
@@ -108,8 +113,39 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(12, gt_output("PlayerPersonnel"))
                          ), #end of PPT tabPanel
                 
-                tabPanel("Opponent Overview", 
+                tabPanel("Player Style Comparisons", 
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header4")),
+                                  column(3, img(src="logo_oregon.png", height = 180, width = 240))
+                         ), #end of header fluidRow
+                         tabsetPanel(type = "pills",
+                           tabPanel("Seperate",
+                                    fluidRow(column(2, align = 'center', uiOutput("ncaa_player_face")),
+                                             column(2, align = 'center', uiOutput("ncaa_player_info"), uiOutput("player_2b_comp")), 
+                                             column(2, align = 'center', uiOutput("ncaa_team_logo"), style = 'border-right:1px solid;'),
+                                             column(2, align = 'center', uiOutput("nba_player_face")),
+                                             column(2, align = 'center', uiOutput("nba_player_info"), uiOutput("player_nba_comp")), 
+                                             column(2, align = 'center', uiOutput("nba_team_logo"))
+                                             ), #end of selector fluidRow
+                                    fluidRow(column(6, plotOutput("ncaa_comp_plot", height = "600px", width = "95%")),
+                                             column(6, plotOutput("nba_comp_plot", height = "600px", width = "95%"))), #end of plots fluidRow
+                                    ), #end of seperate tabPanel
+                           tabPanel("Combined",
+                                    fluidRow(column(2, align = 'center', uiOutput("ncaa_player_face2")),
+                                             column(2, align = 'center', uiOutput("ncaa_player_info2"), uiOutput("player_2b_comp2")), 
+                                             column(2, align = 'center', uiOutput("ncaa_team_logo2"), style = 'border-right:1px solid;'),
+                                             column(2, align = 'center', uiOutput("nba_player_face2")),
+                                             column(2, align = 'center', uiOutput("nba_player_info2"), uiOutput("player_nba_comp2")), 
+                                             column(2, align = 'center', uiOutput("nba_team_logo2"))
+                                    ), #end of selector fluidRow
+                                    fluidRow(column(3),
+                                             column(6, align = 'center', plotOutput("combined_comp_plot", height = "600px")),
+                                             column(3, align = 'center', div(gt_output("otherSimilarPlayers"), style = 'padding-top: 200px;')))
+                                    ) #end of combined tabPanel
+                           ) #end of PC tabset Panel
+                         ), #end of PC tabPanel
+                
+                tabPanel("Opponent Overview", 
+                         fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header5")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
                          fluidRow(column(2, selectInput("trendingStat", "Stat", OO_TrendStat_List, selected = "Winning Margin")),
@@ -120,15 +156,14 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          ), #end of OO tabPanel
                 
                 tabPanel("Shot Charts", 
-                         fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header5")),
+                         fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header6")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         h5("Coming Soon"),
-                         dataTableOutput("test")
+                         h5("Coming Soon")
                          ), #end of SC tabPanel
                 
                 tabPanel("Lineups", 
-                         fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header6")),
+                         fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header7")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
                          h5("Coming Soon")
@@ -139,8 +174,12 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
 
 server = function(input, output, session) {
   
+  session$onSessionEnded(function() {
+    stopApp()
+  })
+  
   #Oregon vs TEAM text output for header on top of all pages
-  output$header6 = output$header5 = output$header4 = output$header3 = output$header2 = output$header = 
+  output$header7 = output$header6 = output$header5 = output$header4 = output$header3 = output$header2 = output$header = 
     renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
   
   #decide which GMC table to use
@@ -1376,6 +1415,314 @@ server = function(input, output, session) {
                          linetype="Conference Games"), color = color3 , size = 1)}
     }
     )
+  
+  #dynamically create input to select players in PC tab
+  player_2b_comp_vec = reactive(ncaa_big_sim %>% select(player, team) %>%
+                                  full_join(ncaa_guard_sim %>% select(player, team)) %>%
+                                  full_join(ncaa_wing_sim %>% select(player, team)) %>%
+                                  filter(team == input$opponent | team == opponent_kp()) %>%
+                                  select(player) %>% unlist() %>% as.character())
+  
+  output$player_2b_comp = renderUI({
+    selectInput("player_2b_comp_temp", "", choices = player_2b_comp_vec(), selected = input$player_2b_comp_temp2)
+  })
+  
+  output$player_2b_comp2 = renderUI({
+    selectInput("player_2b_comp_temp2", "", choices = player_2b_comp_vec(), selected = input$player_2b_comp_temp)
+  })
+  
+  observeEvent(input$player_2b_comp_temp2,
+               {updateSelectInput(session, "player_2b_comp_temp", 
+                                  choices = player_2b_comp_vec(), selected = input$player_2b_comp_temp2)})
+  
+  #create output items for ncaa players reactive headshots, logos, and bio info
+  base_comp_table = reactive(ncaa_big_sim %>%
+                               full_join(ncaa_guard_sim) %>%
+                               full_join(ncaa_wing_sim) %>%
+                               filter(team == input$opponent | team == opponent_kp()) %>%
+                               filter(player == input$player_2b_comp_temp))
+  
+  ncaa_player_face_url = reactive(base_comp_table() %>%
+                                    select(URL) %>% unlist() %>% as.character())
+  output$ncaa_player_face2 = output$ncaa_player_face = renderUI(tags$img(src = ncaa_player_face_url(), height = 130))
+  
+  ncaa_team_logo_url = reactive(graphic_info_OS %>% 
+                                  filter(school == input$opponent | school == opponent_kp()) %>%
+                                  select(logo) %>% unlist() %>% as.character())
+  output$ncaa_team_logo2 = output$ncaa_team_logo = renderUI(tags$img(src = ncaa_team_logo_url(), height = 150))
+  
+  ncaa_player_info_df = reactive(base_comp_table() %>%
+                                   select(class, X., pos))
+  
+  output$ncaa_player_info2 = output$ncaa_player_info = renderUI(HTML(paste0('<h3 style="font-size:25px; font-weight:bold">',
+                                                ncaa_player_info_df()[1,1], 
+                                                "&nbsp;&nbsp;&nbsp;&nbsp;#",
+                                                ncaa_player_info_df()[1,2], 
+                                                "&nbsp;&nbsp;&nbsp;&nbsp;",
+                                                ncaa_player_info_df()[1,3], 
+                                                '</h3>')))
+  
+  #output for nba players reactive headshots, logos, and bio info
+  nba_player_face_url = reactive(base_comp_table() %>%
+                                    select(sim_1_url) %>% unlist() %>% as.character())
+  
+  output$nba_player_face2 = output$nba_player_face = renderUI(tags$img(src = nba_player_face_url(), height = 130))
+  
+  nba_player_info_df = reactive(base_comp_table() %>%
+                                  select(sim_1) %>%
+                                  left_join(nba_big_style %>% select(player, team), by = c("sim_1" = "player")) %>%
+                                  left_join(nba_wing_style %>% select(player, team), by = c("sim_1" = "player")) %>%
+                                  left_join(nba_guard_style %>% select(player, team), by = c("sim_1" = "player")) %>%
+                                  mutate(team.x = ifelse(is.na(team.x), "", team.x)) %>% mutate(team.y = ifelse(is.na(team.y), "", team.y)) %>% mutate(team = ifelse(is.na(team), "", team)) %>%
+                                  mutate(team = paste0(team, team.x, team.y)) %>% select(sim_1, team) %>%
+                                  left_join(espn_nba_teams(), by = c("team" = "abbreviation")) %>%
+                                  left_join(as.data.frame(nba_commonallplayers()), by = c("sim_1" = "CommonAllPlayers.DISPLAY_FIRST_LAST")) %>%
+                                  select(sim_1, team, logo_dark, CommonAllPlayers.PERSON_ID, color) %>%
+                                  mutate(color = paste0("#", color),
+                                         color = ifelse(color == "#NA", "#17408B", color)))
+  
+  nba_extra_player_info_df = reactive(nba_commonplayerinfo(player_id = nba_player_info_df() %>% select(CommonAllPlayers.PERSON_ID) %>% as.character()) %>%
+                                        as.data.frame() %>%
+                                        filter(row_number()==1) %>%
+                                        select(CommonPlayerInfo.DISPLAY_FIRST_LAST, CommonPlayerInfo.JERSEY, CommonPlayerInfo.POSITION))
+  
+  nba_team_logo_url = reactive(nba_player_info_df() %>% select(logo_dark) %>%
+                                 mutate(logo_dark = ifelse(is.na(logo_dark), "https://cdn.freebiesupply.com/images/large/2x/nba-logo-transparent.png", logo_dark)) %>%
+                                 unlist() %>% as.character())
+  
+  output$nba_team_logo2 = output$nba_team_logo = renderUI(tags$img(src = nba_team_logo_url(), height = 140))
+  
+  output$nba_player_info2 = output$nba_player_info = renderUI(HTML(paste0('<h3 style="font-size:25px; font-weight:bold">#',
+                                                 nba_extra_player_info_df()[1,2], 
+                                                 "&nbsp;&nbsp;&nbsp;&nbsp;",
+                                                 nba_extra_player_info_df()[1,3], 
+                                                 '</h3>')))
+  
+  output$player_nba_comp2 = output$player_nba_comp = renderUI(HTML('<h3 style="font-size:32px; font-weight:bold">',
+                                         nba_extra_player_info_df()[1,1], 
+                                         '</h3>'))
+  
+  #create radar plot outputs for player comps
+  output$ncaa_comp_plot = renderPlot(
+    if(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% nrow() == 1){
+      ncaa_guard_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(x3_p_s:dreb) %>%
+        rbind(rep(1,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              rep(0,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              .) %>%
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+                               "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
+                   pfcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5),
+                   plwd = 2, cglcol = "grey", cglty = 1, cglwd = 0.8)}
+    else if(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% nrow() == 1){
+      ncaa_wing_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(x3_p_s:dreb) %>%
+        rbind(rep(1,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              rep(0,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              .) %>%
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+                              "Rim\nProtector", "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
+                   pfcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5),
+                   plwd = 2, cglcol = "grey", cglty = 1, cglwd = 0.8)}
+    else{
+      ncaa_big_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(stretch_big:dreb) %>%
+        rbind(rep(1,ncol(ncaa_big_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(stretch_big:dreb))), 
+              rep(0,ncol(ncaa_big_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(stretch_big:dreb))), 
+              .) %>%
+        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Limits TOs", "Rim\nProtector",
+                               "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
+                   pfcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5),
+                   plwd = 2, cglcol = "grey", cglty = 1, cglwd = 0.8)})
+  
+  output$nba_comp_plot = renderPlot(
+    if(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% nrow() == 1){
+      ncaa_guard_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(sim_1) %>%
+        left_join(nba_guard_style %>% select(player, x3_p_s:dreb), by = c("sim_1" = "player")) %>%
+        rbind(rep(1,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              rep(0,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              .) %>%
+        select(-sim_1) %>%
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+                               "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
+                   pfcol = ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color) %>% alpha(.5),
+                   plwd = 2, cglcol = "grey", cglty = 1, cglwd = 0.8)}
+    else if(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% nrow() == 1){
+      ncaa_wing_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(sim_1) %>%
+        left_join(nba_wing_style %>% select(player, x3_p_s:dreb), by = c("sim_1" = "player")) %>%
+        rbind(rep(1,ncol(ncaa_wing_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              rep(0,ncol(ncaa_wing_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              .) %>%
+        select(-sim_1) %>%
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+                               "Rim\nProtector", "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
+                   pfcol = ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color) %>% alpha(.5),
+                   plwd = 2, cglcol = "grey", cglty = 1, cglwd = 0.8)}
+    else{
+      ncaa_big_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(sim_1) %>%
+        left_join(nba_big_style %>% select(player, stretch_big:dreb), by = c("sim_1" = "player")) %>%
+        rbind(rep(1,ncol(ncaa_big_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(stretch_big:dreb))), 
+              rep(0,ncol(ncaa_big_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(stretch_big:dreb))), 
+              .) %>%
+        select(-sim_1) %>%
+        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Limits TOs", "Rim\nProtector",
+                               "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
+                   pfcol = ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color) %>% alpha(.5),
+                   plwd = 2, cglcol = "grey", cglty = 1, cglwd = 0.8)})
+  
+  output$combined_comp_plot = renderPlot(
+    if(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% nrow() == 1){
+      par(mar = c(4, 0, .5, 0))
+      ncaa_guard_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(sim_1) %>%
+        left_join(nba_guard_style %>% select(player, x3_p_s:dreb), by = c("sim_1" = "player")) %>%
+        rbind(rep(1,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              rep(0,ncol(ncaa_guard_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              .) %>%
+        select(-sim_1) %>%
+        rbind(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(x3_p_s:dreb)) %>%
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+                               "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = c(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
+                     graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color)),
+                   pfcol = c(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                     left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color) %>% alpha(.5),
+                     graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5)),
+                   plwd = 2, plty = 1, cglcol = "grey", cglty = 1, cglwd = 0.8)
+      
+      legend(
+        x = -1.3, y = -1.1, legend = c(input$player_2b_comp_temp, ncaa_guard_sim %>% filter(player==input$player_2b_comp_temp) %>% pull(sim_1)), 
+        horiz = F, bty = "n", pch = 16 , 
+        col = c(graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
+                ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                  left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color)),
+        text.col = "black", cex = 1, pt.cex = 1.5, lty = 1, lwd = 2, yjust = 1)}
+    else if(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% nrow() == 1){
+      par(mar = c(4, 0, .5, 0))
+      ncaa_wing_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(sim_1) %>%
+        left_join(nba_wing_style %>% select(player, x3_p_s:dreb), by = c("sim_1" = "player")) %>%
+        rbind(rep(1,ncol(ncaa_wing_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              rep(0,ncol(ncaa_wing_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(x3_p_s:dreb))), 
+              .) %>%
+        select(-sim_1) %>%
+        rbind(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(x3_p_s:dreb)) %>%
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+                               "Rim\nProtector", "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = c(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                              left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
+                            graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color)),
+                   pfcol = c(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                               left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color) %>% alpha(.5),
+                             graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5)),
+                   plwd = 2, plty = 1, cglcol = "grey", cglty = 1, cglwd = 0.8)
+      
+      legend(
+        x = -1.3, y = -.85, legend = c(input$player_2b_comp_temp, ncaa_wing_sim %>% filter(player==input$player_2b_comp_temp) %>% pull(sim_1)), 
+        horiz = F, bty = "n", pch = 16 , 
+        col = c(graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
+                ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                  left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color)),
+        text.col = "black", cex = 1, pt.cex = 1.5, lty = 1, lwd = 2, yjust = 1)}
+    else{
+      par(mar = c(4, 0, .5, 0))
+      ncaa_big_sim %>% 
+        filter(player == input$player_2b_comp_temp) %>% 
+        select(sim_1) %>%
+        left_join(nba_big_style %>% select(player, stretch_big:dreb), by = c("sim_1" = "player")) %>%
+        rbind(rep(1,ncol(ncaa_big_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(stretch_big:dreb))), 
+              rep(0,ncol(ncaa_big_sim %>% 
+                           filter(player == input$player_2b_comp_temp) %>% 
+                           select(stretch_big:dreb))), 
+              .) %>%
+        select(-sim_1) %>%
+        rbind(ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(stretch_big:dreb)) %>%
+        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Limits TOs", "Rim\nProtector",
+                               "Offensive\nRebounder", "Defensive\nRebounder"),
+                   pcol = c(ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                              left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
+                            graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color)),
+                   pfcol = c(ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                               left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color) %>% alpha(.5),
+                             graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5)),
+                   plwd = 2, plty = 1, cglcol = "grey", cglty = 1, cglwd = 0.8)
+      legend(
+        x = -1.3, y = -.7, legend = c(input$player_2b_comp_temp, ncaa_big_sim %>% filter(player==input$player_2b_comp_temp) %>% pull(sim_1)), 
+        horiz = F, bty = "n", pch = 16 , 
+        col = c(graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
+                ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
+                  left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color)),
+        text.col = "black", cex = 1, pt.cex = 1.5, lty = 1, lwd = 2, yjust = 1)
+      })
+  
+  output$otherSimilarPlayers = render_gt(ncaa_guard_sim %>% 
+                                           filter(player == input$player_2b_comp_temp) %>%
+                                           select(sim_2, sim_3, sim_4, sim_5) %>%
+                                           pivot_longer(cols = c(sim_2, sim_3, sim_4, sim_5)) %>%
+                                           select(value) %>%
+                                           gt() %>%
+                                           cols_label(value = "Other\nSimilar\nPlayers") %>%
+                                           cols_align(align = "center", columns = value) %>%
+                                           gt_theme_pff())
+  
 
   
   } #end of server
