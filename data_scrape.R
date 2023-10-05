@@ -3,7 +3,7 @@ p_load(tidyverse, janitor, cfbplotR, stringr, readxl, hoopR, toRvik, rvest)
 
 our_team = "Oregon"
 opponentList = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
-opponentSRurl_db = read.csv("UOregon_Prescout/data/opp_url.csv")
+opponentSRurl_db = read.csv("data/opp_url.csv")
 year=2023
 
 OO_TrendStat_List = c("Winning Margin" = "Winning_Margin", 
@@ -180,15 +180,15 @@ for(c in 2:ncol(SR_team_stats)){
 colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
 
 #read headshot url table
-headshot_urls_db = read.csv("UOregon_Prescout/data/headshot_url.csv") %>%
+headshot_urls_db = read.csv("data/headshot_url.csv") %>%
   mutate(URL = ifelse(URL == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
 
 #write the data to file
-write.csv(GMC_AP, file = "UOregon_Prescout/data/GMC_AP.csv", row.names = FALSE)
-write.csv(GMC_OS, file = "UOregon_Prescout/data/GMC_OS.csv", row.names = FALSE)
-write.csv(GMC_NET, file = "UOregon_Prescout/data/GMC_NET.csv", row.names = FALSE)
-write.csv(GMC_medians, file = "UOregon_Prescout/data/GMC_medians.csv", row.names = FALSE)
-write.csv(graphic_info_OS, file = "UOregon_Prescout/data/graphic_info_OS.csv", row.names = FALSE)
+write.csv(GMC_AP, file = "data/GMC_AP.csv", row.names = FALSE)
+write.csv(GMC_OS, file = "data/GMC_OS.csv", row.names = FALSE)
+write.csv(GMC_NET, file = "data/GMC_NET.csv", row.names = FALSE)
+write.csv(GMC_medians, file = "data/GMC_medians.csv", row.names = FALSE)
+write.csv(graphic_info_OS, file = "data/graphic_info_OS.csv", row.names = FALSE)
 
 rm(SR_team_stats, AP_top25, NET_top50, our_schedule, a, c, all_graphic_info, graphic_info_AP, graphic_info_NET)
 
@@ -498,9 +498,9 @@ for(opp in opponentList){
 }
 
 
-write.csv(PPT_data %>% select(-player_join), file = "UOregon_Prescout/data/PPT_data.csv", row.names = FALSE)
-write.csv(OO_splits_data, file = "UOregon_Prescout/data/OO_splits_data.csv", row.names = FALSE)
-write.csv(Opp_Trends_df, file = "UOregon_Prescout/data/Opp_Trends_df.csv", row.names = FALSE)
+write.csv(PPT_data %>% select(-player_join), file = "data/PPT_data.csv", row.names = FALSE)
+write.csv(OO_splits_data, file = "data/OO_splits_data.csv", row.names = FALSE)
+write.csv(Opp_Trends_df, file = "data/Opp_Trends_df.csv", row.names = FALSE)
 
 rm(df, headshots_PPT, kp_pos, KP_PPT, KP2_PPT, lastGstarters, OO_trend_per_stat, opp_game_stats, opp_game_stats_away,
    opp_game_stats_conf, opp_game_stats_home, opp_game_stats_losses, opp_game_stats_net100, opp_game_stats_net50, 
@@ -547,7 +547,7 @@ ncaa_player_stats = player_totals %>% full_join(player_advanced) %>%
   rename(team = school)
 
 #load in a saved dataset of nba total and advanced stats
-nba_player_stats = read.csv("UOregon_Prescout/data/nba_stats.csv") %>%
+nba_player_stats = read.csv("data/nba_stats.csv") %>%
   clean_names() %>% 
   mutate(class = 'NBA') %>%
   #match names to ncaa table
@@ -712,13 +712,13 @@ ncaa_wing_sim = sim_list[[2]][[1]] %>% left_join(PPT_data %>% select(player_join
 ncaa_big_sim = sim_list[[3]][[1]] %>% left_join(PPT_data %>% select(player_join, URL, '#'), by = "player_join") %>% select(-player_join)
 
 
-write.csv(ncaa_guard_sim, file = "UOregon_Prescout/data/ncaa_guard_sim.csv", row.names = FALSE)
-write.csv(ncaa_wing_sim, file = "UOregon_Prescout/data/ncaa_wing_sim.csv", row.names = FALSE)
-write.csv(ncaa_big_sim, file = "UOregon_Prescout/data/ncaa_big_sim.csv", row.names = FALSE)
+write.csv(ncaa_guard_sim, file = "data/ncaa_guard_sim.csv", row.names = FALSE)
+write.csv(ncaa_wing_sim, file = "data/ncaa_wing_sim.csv", row.names = FALSE)
+write.csv(ncaa_big_sim, file = "data/ncaa_big_sim.csv", row.names = FALSE)
 
-write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "UOregon_Prescout/data/nba_guard_style.csv", row.names = FALSE)
-write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "UOregon_Prescout/data/nba_wing_style.csv", row.names = FALSE)
-write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "UOregon_Prescout/data/nba_big_style.csv", row.names = FALSE)
+write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_guard_style.csv", row.names = FALSE)
+write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_wing_style.csv", row.names = FALSE)
+write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_big_style.csv", row.names = FALSE)
 
 rm(a, all_player_stats, big_stats, guard_stats, nba_big_styles, nba_guard_styles, nba_player_stats, nba_wing_styles, ncaa_big_styles,
    ncaa_guard_styles, ncaa_player_stats, ncaa_wing_styles, raw_pa, raw_pt, player_totals_partial, player_advanced_partial, 
