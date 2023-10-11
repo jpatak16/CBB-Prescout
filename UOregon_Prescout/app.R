@@ -7,22 +7,22 @@ our_team = "Oregon"
 opponentList = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
 year=2023
 
-#load in data
-GMC_AP = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/GMC_AP.csv")
-GMC_OS = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/GMC_OS.csv")
-GMC_NET = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/GMC_NET.csv")
-GMC_medians = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/GMC_medians.csv")
-graphic_info_OS = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/graphic_info_OS.csv")
-PPT_data = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/PPT_data.csv", check.names = FALSE)
-OO_splits_data = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/OO_splits_data.csv")
-Opp_Trends_df = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/Opp_Trends_df.csv")
-nba_stats = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/nba_stats.csv")
-ncaa_guard_sim = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/ncaa_guard_sim.csv")
-ncaa_wing_sim = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/ncaa_wing_sim.csv", colClasses = c("pos"="character"))
-ncaa_big_sim = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/ncaa_big_sim.csv")
-nba_big_style = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/nba_big_style.csv")
-nba_wing_style = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/nba_wing_style.csv")
-nba_guard_style = read.csv("https://raw.githubusercontent.com/jpatak16/CBB-Prescout/main/data/nba_guard_style.csv")
+
+GMC_AP = read.csv("data/GMC_AP.csv")
+GMC_OS = read.csv("data/GMC_OS.csv")
+GMC_NET = read.csv("data/GMC_NET.csv")
+GMC_medians = read.csv("data/GMC_medians.csv")
+graphic_info_OS = read.csv("data/graphic_info_OS.csv")
+PPT_data = read.csv("data/PPT_data.csv", check.names = FALSE)
+OO_splits_data = read.csv("data/OO_splits_data.csv")
+Opp_Trends_df = read.csv("data/Opp_Trends_df.csv")
+nba_stats = read.csv("data/nba_stats.csv")
+ncaa_guard_sim = read.csv("data/ncaa_guard_sim.csv")
+ncaa_wing_sim = read.csv("data/ncaa_wing_sim.csv", colClasses = c("pos"="character"))
+ncaa_big_sim = read.csv("data/ncaa_big_sim.csv")
+nba_big_style = read.csv("data/nba_big_style.csv")
+nba_wing_style = read.csv("data/nba_wing_style.csv")
+nba_guard_style = read.csv("data/nba_guard_style.csv")
 
 
 #the list of options for our metric comparison plots
