@@ -23,6 +23,9 @@ ncaa_big_sim = read.csv("data/ncaa_big_sim.csv")
 nba_big_style = read.csv("data/nba_big_style.csv")
 nba_wing_style = read.csv("data/nba_wing_style.csv")
 nba_guard_style = read.csv("data/nba_guard_style.csv")
+rotation_times = read.csv("data/rotation_times.csv")
+headshot_url = read.csv("data/headshot_url.csv") %>% mutate(URL = ifelse(URL == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", URL))
+opponentSRurl_db = read.csv("data/opp_url.csv")
 
 
 #the list of options for our metric comparison plots
@@ -166,7 +169,21 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header7")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
                                   ), #end of header fluidRow
-                         h5("Coming Soon")
+                         tabsetPanel(type = "pills",
+                                     tabPanel("Rotation Visualization",
+                                              sidebarLayout(
+                                                sidebarPanel(width = 2,
+                                                             uiOutput("rotOpp"), 
+                                                             selectInput("rvFilter", "Filter", c("All Players", "Starters", "Guards", "Wings", "Bigs"))),
+                                                mainPanel(width = 10,
+                                                          plotOutput("rvPlot"),
+                                                          tableOutput("test")))
+                                              ), #end of RV tabPanel
+                                     tabPanel("Lineup Analysis",
+                                              ), #end of LA tabPanel
+                                     tabPanel("Lineup Finder"
+                                              ), #end of LF tabPanel
+                         ) #end of LU tabset Panel
                          ), #end of LU tabPanel
                 
                 ) #end of navbarPage
@@ -1747,6 +1764,175 @@ server = function(input, output, session) {
         gt_theme_pff()
     }
     )
+  
+  #dynamically create input to select games in RV tab
+  rotOpp_vec = reactive(rotation_times %>%
+                          mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>% 
+                          arrange(desc(g_date)) %>%
+                          mutate(g_date = substr(g_date, 6, 11)) %>%
+                          mutate(label = paste0(opp, " (", g_date, ")")) %>%
+                          filter(team == input$opponent) %>%
+                          select(label) %>% unique() %>%
+                          unlist() %>% as.character())
+  
+  output$rotOpp = renderUI({
+    selectInput("rotOpp_temp", "Game(s)", choices = c("All Season", "Last 5 Games", rotOpp_vec()))
+  })
+  
+  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% .[[1,2]])
+  SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
+  player_join_rv = reactive(SRopponentTables()[[1]] %>%
+                              select('#', Player, Pos) %>%
+                              mutate(player_join = standardize_name(Player)) %>%
+                              distinct() %>%
+                              left_join(PPT_data %>% filter(Team == input$opponent) %>% select("#", "All Players":"Starters"),
+                                        by = "#") %>%
+                              unique())
+  
+  starter_rv = reactive(rotation_times %>%
+                          mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
+                          mutate(g_date = substr(g_date, 6, 11)) %>%
+                          mutate(label = paste0(opp, " (", g_date, ")")) %>%
+                          right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
+                                     by = c("on_court"="player_join", "team"="Team")) %>%
+                          filter(team == input$opponent,
+                                 label == input$rotOpp_temp) %>%
+                          mutate(started = ifelse(stint_start_s == 2400, 1, 0)) %>%
+                          group_by(on_court) %>%
+                          summarise(started = sum(started)) %>%
+                          select(on_court, started))
+  
+  #yvar order
+  rot_times_yvar = reactive(
+    if(input$rotOpp_temp != "All Season" & input$rotOpp_temp != "Last 5 Games"){
+      rotation_times %>%
+        mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
+        mutate(g_date = substr(g_date, 6, 11)) %>%
+        mutate(label = paste0(opp, " (", g_date, ")")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
+                   by = c("on_court"="player_join", "team"="Team")) %>%
+        left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
+        filter(team == input$opponent,
+               label == input$rotOpp_temp) %>%
+        left_join(starter_rv(), by = "on_court") %>%
+        mutate(secs_played = stint_start_s - stint_end_s,
+               Starters = started) %>%
+        filter(.data[[input$rvFilter]] == 1) %>%
+        group_by(Player.y) %>%
+        summarise(sec_p = sum(secs_played, na.rm = T)) %>%
+        filter(sec_p > 0) %>%
+        mutate(yvar = rank(sec_p, ties.method = "first"))}
+    else if(input$rotOpp_temp == "All Season"){
+      rotation_times %>%
+        mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
+        mutate(g_date = substr(g_date, 6, 11)) %>%
+        mutate(label = paste0(opp, " (", g_date, ")")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
+                   by = c("on_court"="player_join", "team"="Team")) %>%
+        left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
+        filter(team == input$opponent,
+               .data[[input$rvFilter]] == 1) %>%
+        mutate(secs_played = stint_start_s - stint_end_s) %>%
+        group_by(Player.y) %>%
+        summarise(sec_p = sum(secs_played, na.rm = T)) %>%
+        filter(sec_p > 0) %>%
+        mutate(yvar = rank(sec_p, ties.method = "first"))}
+    else{
+      rotation_times %>%
+        mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
+        mutate(g_date = substr(g_date, 6, 11)) %>%
+        mutate(label = paste0(opp, " (", g_date, ")")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
+                   by = c("on_court"="player_join", "team"="Team")) %>%
+        left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
+        filter(team == input$opponent,
+               label %in% rotOpp_vec()[1:5],
+               .data[[input$rvFilter]] == 1) %>%
+        mutate(secs_played = stint_start_s - stint_end_s) %>%
+        group_by(Player.y) %>%
+        summarise(sec_p = sum(secs_played, na.rm = T)) %>%
+        filter(sec_p > 0) %>%
+        mutate(yvar = rank(sec_p, ties.method = "first"))}
+    )
+  
+  #make rot viz
+  rot_times_filtered = reactive(
+    if(input$rotOpp_temp != "All Season" & input$rotOpp_temp != "Last 5 Games"){
+      rotation_times %>%
+        mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
+        mutate(g_date = substr(g_date, 6, 11)) %>%
+        mutate(label = paste0(opp, " (", g_date, ")")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
+                   by = c("on_court"="player_join", "team"="Team")) %>%
+        left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
+        filter(team == input$opponent,
+               label == input$rotOpp_temp) %>%
+        left_join(starter_rv(), by = "on_court") %>%
+        mutate(axis_lab1 = paste0("<img src='", URL, "' width='100' />"),
+               Starters = started) %>%
+        filter(.data[[input$rvFilter]] == 1) %>%
+        left_join(rot_times_yvar(), by = "Player.y") %>%
+        select(player=Player.y, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
+    else if(input$rotOpp_temp == "All Season"){
+      rotation_times %>%
+        mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
+        mutate(g_date = substr(g_date, 6, 11)) %>%
+        mutate(label = paste0(opp, " (", g_date, ")")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
+                   by = c("on_court"="player_join", "team"="Team")) %>%
+        left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
+        filter(team == input$opponent,
+               .data[[input$rvFilter]] == 1) %>%
+        mutate(axis_lab1 = paste0("<img src='", URL, "' width='100' />")) %>%
+        left_join(rot_times_yvar(), by = "Player.y") %>%
+        select(player=Player.y, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
+    else{
+      rotation_times %>%
+        mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
+        mutate(g_date = substr(g_date, 6, 11)) %>%
+        mutate(label = paste0(opp, " (", g_date, ")")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
+                   by = c("on_court"="player_join", "team"="Team")) %>%
+        left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
+        filter(team == input$opponent,
+               label %in% rotOpp_vec()[1:5],
+               .data[[input$rvFilter]] == 1) %>%
+        mutate(axis_lab1 = paste0("<img src='", URL, "' width='100' />")) %>%
+        left_join(rot_times_yvar(), by = "Player.y") %>%
+        select(player=Player.y, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
+    )
+  
+  output$rvPlot = renderPlot(
+    rot_times_filtered() %>%
+      ggplot() +
+      geom_segment(aes(x = stint_start_s, xend = stint_end_s, y = yvar, yend = yvar), 
+                   alpha = 1/(rot_times_filtered() %>% filter(!is.na(label)) %>% select(label) %>% unique() %>% nrow()), 
+                   color = "darkred", size = 5) +
+      ylab("") + xlab("") +
+      scale_x_continuous(breaks = c(2400, 1800, 1200, 600, 0), 
+                         labels = c("1H 20:00", "1H 10:00","Halftime", "2H 10:00", "2H 0:00"),
+                         trans = "reverse") +
+      scale_y_continuous(breaks = c(1:(rot_times_filtered()$yvar %>% unique() %>% sort() %>% length())),
+                         limits = c(.9, .1+(rot_times_filtered()$yvar %>% unique() %>% sort() %>% length())),
+                         labels = rot_times_filtered() %>% select(axis_lab1, yvar) %>% filter(!is.na(yvar)) %>% unique() %>% arrange(yvar) %>% pull(axis_lab1),
+                         sec.axis = sec_axis(trans = ~.*1,
+                                             name = "", 
+                                             breaks = c(1:(rot_times_filtered()$yvar %>% unique() %>% sort() %>% length())),
+                                             labels = rot_times_filtered() %>% 
+                                               select(yvar, player) %>% 
+                                               filter(!is.na(yvar)) %>%
+                                               unique() %>% 
+                                               arrange(yvar) %>% 
+                                               pull(player))) +
+      geom_vline(xintercept = 1200, size = 1, linetype = "dashed") +
+      theme_classic() +
+      theme(axis.text.y = element_markdown(color = "black", size = 15),
+            plot.margin = unit(c(.25, 0, 0, 0), "inches")),
+    height = function() ifelse(length(rot_times_filtered() %>% select(axis_lab1) %>% unlist() %>% unique()) >=7,
+                                      50+(75*length(rot_times_filtered() %>% select(axis_lab1) %>% unlist() %>% unique())),
+                                      50+(75*length(rot_times_filtered() %>% select(axis_lab1) %>% unlist() %>% unique()))))
+                            
+  
   
 
   

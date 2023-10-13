@@ -181,7 +181,7 @@ colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
 
 #read headshot url table
 headshot_urls_db = read.csv("data/headshot_url.csv") %>%
-  mutate(URL = ifelse(URL == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop", URL))
+  mutate(URL = ifelse(URL == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", URL))
 
 #write the data to file
 write.csv(GMC_AP, file = "data/GMC_AP.csv", row.names = FALSE)
@@ -325,16 +325,16 @@ for(opp in opponentList){
     mutate(conf = ifelse(conf == "Amer", "AAC", conf)) %>%
     filter(team == opponent_kp) %>%
     .[[1,3]]
-  
+
   #opponent espn id of opp
   opp_id = espn_mbb_teams() %>%
     filter(toupper(team) == toupper(opp)) %>%
     select(team_id) %>%
     .[[1,1]]
-  
+
   #find the spread in every game our opp has played this season
   opp_spreads = {
-    df <- load_mbb_schedule() %>% 
+    df <- load_mbb_schedule(seasons = year) %>%
       filter(home_id == opp_id | away_id == opp_id,
              status_type_completed == TRUE) %>%
       select(game_id = id, date, home_short_display_name, away_short_display_name, home_id, away_id) %>%
@@ -345,29 +345,29 @@ for(opp in opponentList){
              date = gsub("Z", ":00", date),
              date = strptime(date, "%Y-%m-%d %H:%M:%S") - 6*60*60,
              game_date = gsub("-", "", substr(date, 1, 10)))
-    
+
     for(r in 1:nrow(df)) {
-      df[r,"spread"] = espn_mbb_betting(df$game_id[r])[[1]] %>% 
+      df[r,"spread"] = espn_mbb_betting(df$game_id[r])[[1]] %>%
         filter(provider_name == "consensus") %>% .[[1,"spread"]] %>% as.integer()
       Sys.sleep(3)}
-    
-    df <- df %>% 
+
+    df <- df %>%
       mutate(spread = ifelse(home_id == opp_id, spread, spread*-1),
              game_date = as.double(game_date)) %>%
       select(game_date, spread)
-    
+
   }
-  
+
   #find other stats used in OO Trend table and format column names to match select input
   opp_gp_stats = kp_gameplan(opponent_kp, year)[[1]] %>%
-    select(game_date, Pace=pace, Offensive_Efficency=off_eff, Defensive_Efficency=def_eff, 
-           Points_Scored=team_score, Points_Allowed=opponent_score, 
-           Offensive_3PAr=off_fg_3a_pct, 'Offensive_3Ppct'=off_fg_3_pct, 'Offensive_TOpct'=off_to_pct, 
-           'Offensive_OREBpct'=off_or_pct, Offensive_FTr=off_ftr, 
-           Defensive_3PAr=def_fg_3a_pct, 'Defensive_3Ppct'=def_fg_3_pct, 'Defensive_TOpct'=def_to_pct, 
+    select(game_date, Pace=pace, Offensive_Efficency=off_eff, Defensive_Efficency=def_eff,
+           Points_Scored=team_score, Points_Allowed=opponent_score,
+           Offensive_3PAr=off_fg_3a_pct, 'Offensive_3Ppct'=off_fg_3_pct, 'Offensive_TOpct'=off_to_pct,
+           'Offensive_OREBpct'=off_or_pct, Offensive_FTr=off_ftr,
+           Defensive_3PAr=def_fg_3a_pct, 'Defensive_3Ppct'=def_fg_3_pct, 'Defensive_TOpct'=def_to_pct,
            'Defensive_OREBpct'=def_or_pct, Defensive_FTr=def_ftr)
-  
-  
+
+
   #pull trending stats and other stats used for formatting
   opp_game_stats = kp_team_schedule(opponent_kp, year) %>%
     select(opponent, game_date, location, conference_game) %>%
@@ -382,13 +382,13 @@ for(opp in opponentList){
     #find NET rankings for teams our opp has played
     left_join(bart_tourney_sheets() %>%
                 mutate(team = gsub(" N4O", "", team),
-                       team = gsub(" F4O", "", team), 
+                       team = gsub(" F4O", "", team),
                        team = gsub(" St.", " State", team),
                        team = ifelse(team=="McNeese State", "McNeese St.", team)) %>%
                 mutate(team = clean_school_names(team)) %>%
                 select(opponent=team, net)) %>%
-    mutate(net_rk = ifelse(net <= 100, 
-                           ifelse(net <= 50, "NET Top 50", "NET Top 100"), 
+    mutate(net_rk = ifelse(net <= 100,
+                           ifelse(net <= 50, "NET Top 50", "NET Top 100"),
                            "Other"),
            conference_game = ifelse(conference_game==TRUE, opp_conf, "OOC")) %>%
     #create ATS Margin
@@ -396,7 +396,7 @@ for(opp in opponentList){
     mutate(ATS_Margin = Winning_Margin + spread) %>%
     #join in other used stats
     left_join(opp_gp_stats, by="game_date")
-  
+
   #create separate data frames to split the data based on the input so that we can calculate mean in each split
   for(stat in OO_TrendStat_List){
     opp_game_stats_recency5 = opp_game_stats %>% filter(!is.na(team_score)) %>%
@@ -407,7 +407,7 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     opp_game_stats_recency10 = opp_game_stats %>% filter(!is.na(team_score)) %>%
       .[(nrow(opp_game_stats %>% filter(!is.na(team_score)))-9):nrow(opp_game_stats %>% filter(!is.na(team_score))),] %>%
       mutate(recency10 = "Last 10 Games",
@@ -416,7 +416,7 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     opp_game_stats_home = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(location == "Home") %>%
       mutate(Team = opp,
@@ -424,7 +424,7 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     opp_game_stats_away = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(location == "Away") %>%
       mutate(Team = opp,
@@ -432,7 +432,7 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     opp_game_stats_net50 = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(net <= 50) %>%
       mutate(Team = opp,
@@ -448,7 +448,7 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     opp_game_stats_wins = opp_game_stats %>%
       filter(wl == "W") %>%
       mutate(Team = opp,
@@ -456,7 +456,7 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     opp_game_stats_losses = opp_game_stats %>%
       filter(wl == "L") %>%
       mutate(Team = opp,
@@ -464,7 +464,7 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     opp_game_stats_conf = opp_game_stats %>% filter(!is.na(team_score)) %>%
       filter(conference_game == opp_conf) %>%
       mutate(Team = opp,
@@ -472,27 +472,27 @@ for(opp in opponentList){
              variable = stat) %>%
       select(Team, split, variable, game_code, stat) %>%
       rename(stats = 5)
-    
+
     OO_trend_per_stat = rbind(opp_game_stats_recency5, opp_game_stats_recency10,
                               opp_game_stats_home, opp_game_stats_away,
                               opp_game_stats_net50, opp_game_stats_net100,
                               opp_game_stats_wins, opp_game_stats_losses, opp_game_stats_conf)
-    
+
     OO_splits_data = rbind(OO_splits_data, OO_trend_per_stat)
   }
-  
-  
+
+
   #limit teams on the trends graph to games that have been played already and the next three games
   Opp_Trends_df_team = rbind(opp_game_stats %>% filter(!is.na(team_score)),
                         opp_game_stats %>% filter(is.na(team_score)) %>% .[1:3,]) %>%
     filter(!is.na(opponent)) %>%
     mutate(Team = opp)
-  
+
   Opp_Trends_df = rbind(Opp_Trends_df, Opp_Trends_df_team)
-  
-  
-  
-  
+
+
+
+
 
   Sys.sleep(30)
 }
@@ -1566,4 +1566,4 @@ for(t in opponentList){
     }
 }
 
-write.csv(games, file = "data/rotation_times.csv", row.names = F)
+write.csv(rotation_times, file = "data/rotation_times.csv", row.names = F)
