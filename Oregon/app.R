@@ -1,12 +1,34 @@
 library(shiny)
-library(pacman)
-p_load(rvest, tidyverse, janitor, cfbplotR, stringr, gt, gtExtras, hoopR, paletteer, toRvik, ggtext, readxl, fmsb, scales)
+library(tidyverse)
+library(gt)
+library(gtExtras)
+library(ggtext)
+library(fmsb)
+library(cfbplotR)
+library(hoopR)
+library(rvest)
 #remotes::install_github("sportsdataverse/hoopR")
 
 our_team = "Oregon"
-opponentList = c("Houston", "UCONN", "Alabama", "Michigan State", "Washington State", "UCLA")
-year=2023
+viewableOpps = read.csv("data/viewable_opps.csv") %>% rename(team = our_team)
+opponentList = viewableOpps %>% filter(team == our_team) %>% pull(opp)
+this_year=2024
 
+#write a function that will standardize a player's name
+standardize_name = function(player_name){
+  #remove periods
+  name = gsub("\\.", "", player_name)
+  #remove apostrophe
+  name = gsub("'", "", name)
+  #remove dashes
+  name = gsub("-", "", name)
+  #remove spaces and any third or more name element
+  name = paste0(strsplit(name, split = " ")[[1]][1], strsplit(name, split = " ")[[1]][2])
+  #upcase all letters
+  name = toupper(name)
+  return(name)
+}
+standardize_name = Vectorize(standardize_name)
 
 GMC_AP = read.csv("data/GMC_AP.csv")
 GMC_OS = read.csv("data/GMC_OS.csv")
@@ -24,8 +46,10 @@ nba_big_style = read.csv("data/nba_big_style.csv")
 nba_wing_style = read.csv("data/nba_wing_style.csv")
 nba_guard_style = read.csv("data/nba_guard_style.csv")
 rotation_times = read.csv("data/rotation_times.csv")
-headshot_url = read.csv("data/headshot_url.csv") %>% mutate(URL = ifelse(URL == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", URL))
-opponentSRurl_db = read.csv("data/opp_url.csv")
+headshot_url = read.csv("data/headshot_url.csv") %>% mutate(URL = ifelse(athlete_headshot_href == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", athlete_headshot_href))
+opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+  mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
+         KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 
 
 #the list of options for our metric comparison plots
@@ -47,7 +71,7 @@ PPT_ColumnListVecs = list(c("Class", "Pos", "Height", "Weight"),
 PPT_alwaysShow = c("#", "URL", "first", "last", "Team")
 
 OO_TrendStat_List = c("Winning Margin" = "Winning_Margin", 
-                      "ATS Margin" = "ATS_Margin",
+                      #"ATS Margin" = "ATS_Margin",
                       "Pace" = "Pace",
                       "Offensive Efficency" = "Offensive_Efficency", 
                       "Defensive Efficency" = "Defensive_Efficency", 
@@ -113,7 +137,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                   column(4, checkboxGroupInput("columnsPPT", "Visible Columns", choices = PPT_ColumnList, selected = "Player Info"), 
                                          style = "background-color:#f5f5f5")
                                   ), #end of PPT sort/filter options fluidRow
-                         fluidRow(12, gt_output("PlayerPersonnel"))
+                         fluidRow(gt_output("PlayerPersonnel"))
                          ), #end of PPT tabPanel
                 
                 tabPanel("Player Style Comparisons", 
@@ -158,13 +182,6 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                   ) #end of Opp Trends fluidRow 
                          ), #end of OO tabPanel
                 
-                tabPanel("Shot Charts", 
-                         fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header6")),
-                                  column(3, img(src="logo_oregon.png", height = 180, width = 240))
-                                  ), #end of header fluidRow
-                         h5("Coming Soon")
-                         ), #end of SC tabPanel
-                
                 tabPanel("Lineups", 
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header7")),
                                   column(3, img(src="logo_oregon.png", height = 180, width = 240))
@@ -180,8 +197,10 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                                                           tableOutput("test")))
                                               ), #end of RV tabPanel
                                      tabPanel("Lineup Analysis",
+                                              "Under Construction!"
                                               ), #end of LA tabPanel
-                                     tabPanel("Lineup Finder"
+                                     tabPanel("Lineup Finder",
+                                              "Under Construction!"
                                               ), #end of LF tabPanel
                          ) #end of LU tabset Panel
                          ), #end of LU tabPanel
@@ -191,21 +210,18 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
 
 server = function(input, output, session) {
   
-  session$onSessionEnded(function() {
-    stopApp()
-  })
-  
   #Oregon vs TEAM text output for header on top of all pages
   output$header7 = output$header6 = output$header5 = output$header4 = output$header3 = output$header2 = output$header = 
     renderUI(HTML(paste('<h1 style="color:green;font-size:50px">', our_team, " vs ", input$opponent, '</h1>', sep = "")))
   
   #decide which GMC table to use
   GMC = reactive(if(input$displayedTeams == "Our Schedule"){GMC_OS}
-                 else if (input$displayedTeams == "AP Top 25"){GMC_AP}
-                 else if (input$displayedTeams == "NET Top 50"){GMC_NET})
+                 else if (input$displayedTeams == "AP Top 25"){GMC_AP %>% filter(belong == 1 | school == our_team | school == input$opponent)}
+                 else if (input$displayedTeams == "NET Top 50"){GMC_NET %>% filter(belong == 1 | school == our_team | school == input$opponent)})
   #add 'focus' aesthetics to our team and opponent
-  GMC_df = reactive(GMC() %>% mutate(color2 = if_else(school == our_team | school == input$opponent | school == opponent_kp(), NA_character_ ,"b/w"),
-                                     alpha = if_else(school == our_team | school == input$opponent | school == opponent_kp(), 1, .6)))
+  GMC_df = reactive(GMC() %>%
+                      mutate(color2 = if_else(school == our_team | school == input$opponent | school == opponent_kp(), NA_character_ ,"b/w"),
+                             alpha = if_else(school == our_team | school == input$opponent | school == opponent_kp(), 1, .6)))
    
   #Set x var and y var for axis labels
   xvar = reactive(str_split(input$whichGraph, " x ")[[1]][1])
@@ -263,9 +279,9 @@ server = function(input, output, session) {
         theme_bw()}
   }) #end of MetricComp output
   
-  #creates a variable for opponent name when referring to kp functions
-  opponent_kp = reactive(if(input$opponent == "UCONN"){"Connecticut"}
-                         else{gsub(" State", " St.", input$opponent)})
+  #creates a variable for opponent name when referring to kp or espn functions
+  opponent_kp = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% pull(KP_name))
+  opponent_espn = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% pull(ESPN_name))
   
   
   #filter and sort PPtable_raw before making it a gt object
@@ -286,7 +302,7 @@ server = function(input, output, session) {
                         select(PPT_alwaysShow, all_of(filter_PPT())))
   
   #find how many games the opponent has played this season
-  opp_n_games = reactive(kp_team_schedule(opponent_kp(), year) %>% 
+  opp_n_games = reactive(kp_team_schedule(opponent_kp(), this_year) %>% 
     filter(!is.na(w)) %>%
     nrow() %>% as.numeric())
   
@@ -517,13 +533,13 @@ server = function(input, output, session) {
   feb_max = reactive(Opp_Trends_df_dates() %>% filter(month=="02") %>% arrange(desc(day)) %>% .[1,"game_num"] %>% as.numeric() %>% sum(.5))
   
   #set min and maxs for y axis 
-  OO_ymin = reactive(ifelse(min(Opp_Trends_df_filtered()[,input$trendingStat]) >= 0,
-                            min(Opp_Trends_df_filtered()[,input$trendingStat]) - min(Opp_Trends_df_filtered()[,input$trendingStat]) * .15,
-                            min(Opp_Trends_df_filtered()[,input$trendingStat]) + min(Opp_Trends_df_filtered()[,input$trendingStat]) * .05))
+  OO_ymin = reactive(ifelse(min(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) >= 0,
+                            min(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) - min(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) * .15,
+                            min(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) + min(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) * .05))
   
-  OO_ymax = reactive(ifelse(max(Opp_Trends_df_filtered()[,input$trendingStat]) >= 0,
-                            max(Opp_Trends_df_filtered()[,input$trendingStat]) + max(Opp_Trends_df_filtered()[,input$trendingStat]) * .05,
-                            max(Opp_Trends_df_filtered()[,input$trendingStat]) - max(Opp_Trends_df_filtered()[,input$trendingStat]) * .05))
+  OO_ymax = reactive(ifelse(max(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) >= 0,
+                            max(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) + max(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) * .05,
+                            max(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) - max(Opp_Trends_df_filtered()[,input$trendingStat], na.rm = T) * .05))
   
   output$OppTrends = renderPlot(
     
@@ -1532,7 +1548,7 @@ server = function(input, output, session) {
                            filter(player == input$player_2b_comp_temp) %>% 
                            select(x3_p_s:dreb))), 
               .) %>%
-        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Perimeter\nDefender",
                                "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
                    pfcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5),
@@ -1548,7 +1564,7 @@ server = function(input, output, session) {
                            filter(player == input$player_2b_comp_temp) %>% 
                            select(x3_p_s:dreb))), 
               .) %>%
-        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Perimeter\nDefender",
                               "Rim\nProtector", "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
                    pfcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5),
@@ -1564,7 +1580,7 @@ server = function(input, output, session) {
                            filter(player == input$player_2b_comp_temp) %>% 
                            select(stretch_big:dreb))), 
               .) %>%
-        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Limits TOs", "Rim\nProtector",
+        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Rim\nProtector",
                                "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color),
                    pfcol = graphic_info_OS %>% filter(school == input$opponent | school == opponent_kp()) %>% pull(color) %>% alpha(.5),
@@ -1584,7 +1600,7 @@ server = function(input, output, session) {
                            select(x3_p_s:dreb))), 
               .) %>%
         select(-sim_1) %>%
-        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Perimeter\nDefender",
                                "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
                      left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
@@ -1604,7 +1620,7 @@ server = function(input, output, session) {
                            select(x3_p_s:dreb))), 
               .) %>%
         select(-sim_1) %>%
-        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Perimeter\nDefender",
                                "Rim\nProtector", "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
                      left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
@@ -1624,7 +1640,7 @@ server = function(input, output, session) {
                            select(stretch_big:dreb))), 
               .) %>%
         select(-sim_1) %>%
-        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Limits TOs", "Rim\nProtector",
+        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Rim\nProtector",
                                "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
                      left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
@@ -1648,7 +1664,7 @@ server = function(input, output, session) {
               .) %>%
         select(-sim_1) %>%
         rbind(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(x3_p_s:dreb)) %>%
-        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Perimeter\nDefender",
                                "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = c(ncaa_guard_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
                      left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
@@ -1680,7 +1696,7 @@ server = function(input, output, session) {
               .) %>%
         select(-sim_1) %>%
         rbind(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(x3_p_s:dreb)) %>%
-        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Limits TOs", "Perimeter\nDefender",
+        radarchart(vlabels = c("3P\nSpecialist", "Slasher", "Ball\nDominant", "Playmaker", "Perimeter\nDefender",
                                "Rim\nProtector", "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = c(ncaa_wing_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
                               left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
@@ -1712,7 +1728,7 @@ server = function(input, output, session) {
               .) %>%
         select(-sim_1) %>%
         rbind(ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(stretch_big:dreb)) %>%
-        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Limits TOs", "Rim\nProtector",
+        radarchart(vlabels = c("Stretch\nBig", "Draws\nFouls", "Passing\nBig", "Rim\nProtector",
                                "Offensive\nRebounder", "Defensive\nRebounder"),
                    pcol = c(ncaa_big_sim %>% filter(player == input$player_2b_comp_temp) %>% select(sim_1) %>%
                               left_join(nba_player_info_df() %>% select(sim_1, color)) %>% pull(color),
@@ -1779,7 +1795,7 @@ server = function(input, output, session) {
     selectInput("rotOpp_temp", "Game(s)", choices = c("All Season", "Last 5 Games", rotOpp_vec()))
   })
   
-  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% .[[1,2]])
+  opponentSRurl = reactive(opponentSRurl_db %>% filter(opponent == input$opponent) %>% pull(SRurl))
   SRopponentTables = reactive(read_html(opponentSRurl()) %>% html_table())
   player_join_rv = reactive(SRopponentTables()[[1]] %>%
                               select('#', Player, Pos) %>%
@@ -1793,8 +1809,8 @@ server = function(input, output, session) {
                           mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
                           mutate(g_date = substr(g_date, 6, 11)) %>%
                           mutate(label = paste0(opp, " (", g_date, ")")) %>%
-                          right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
-                                     by = c("on_court"="player_join", "team"="Team")) %>%
+                          right_join(headshot_url %>% mutate(player_join = standardize_name(athlete_display_name)), 
+                                     by = c("on_court"="player_join", "team"="team_location")) %>%
                           filter(team == input$opponent,
                                  label == input$rotOpp_temp) %>%
                           mutate(started = ifelse(stint_start_s == 2400, 1, 0)) %>%
@@ -1809,8 +1825,8 @@ server = function(input, output, session) {
         mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
         mutate(g_date = substr(g_date, 6, 11)) %>%
         mutate(label = paste0(opp, " (", g_date, ")")) %>%
-        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
-                   by = c("on_court"="player_join", "team"="Team")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(athlete_display_name)), 
+                   by = c("on_court"="player_join", "team"="team_location")) %>%
         left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
         filter(team == input$opponent,
                label == input$rotOpp_temp) %>%
@@ -1818,7 +1834,7 @@ server = function(input, output, session) {
         mutate(secs_played = stint_start_s - stint_end_s,
                Starters = started) %>%
         filter(.data[[input$rvFilter]] == 1) %>%
-        group_by(Player.y) %>%
+        group_by(Player) %>%
         summarise(sec_p = sum(secs_played, na.rm = T)) %>%
         filter(sec_p > 0) %>%
         mutate(yvar = rank(sec_p, ties.method = "first"))}
@@ -1827,13 +1843,13 @@ server = function(input, output, session) {
         mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
         mutate(g_date = substr(g_date, 6, 11)) %>%
         mutate(label = paste0(opp, " (", g_date, ")")) %>%
-        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
-                   by = c("on_court"="player_join", "team"="Team")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(athlete_display_name)), 
+                   by = c("on_court"="player_join", "team"="team_location")) %>%
         left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
         filter(team == input$opponent,
                .data[[input$rvFilter]] == 1) %>%
         mutate(secs_played = stint_start_s - stint_end_s) %>%
-        group_by(Player.y) %>%
+        group_by(Player) %>%
         summarise(sec_p = sum(secs_played, na.rm = T)) %>%
         filter(sec_p > 0) %>%
         mutate(yvar = rank(sec_p, ties.method = "first"))}
@@ -1842,14 +1858,14 @@ server = function(input, output, session) {
         mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
         mutate(g_date = substr(g_date, 6, 11)) %>%
         mutate(label = paste0(opp, " (", g_date, ")")) %>%
-        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
-                   by = c("on_court"="player_join", "team"="Team")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(athlete_display_name)), 
+                   by = c("on_court"="player_join", "team"="team_location")) %>%
         left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
         filter(team == input$opponent,
                label %in% rotOpp_vec()[1:5],
                .data[[input$rvFilter]] == 1) %>%
         mutate(secs_played = stint_start_s - stint_end_s) %>%
-        group_by(Player.y) %>%
+        group_by(Player) %>%
         summarise(sec_p = sum(secs_played, na.rm = T)) %>%
         filter(sec_p > 0) %>%
         mutate(yvar = rank(sec_p, ties.method = "first"))}
@@ -1862,8 +1878,8 @@ server = function(input, output, session) {
         mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
         mutate(g_date = substr(g_date, 6, 11)) %>%
         mutate(label = paste0(opp, " (", g_date, ")")) %>%
-        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
-                   by = c("on_court"="player_join", "team"="Team")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(athlete_display_name)), 
+                   by = c("on_court"="player_join", "team"="team_location")) %>%
         left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
         filter(team == input$opponent,
                label == input$rotOpp_temp) %>%
@@ -1871,35 +1887,35 @@ server = function(input, output, session) {
         mutate(axis_lab1 = paste0("<img src='", URL, "' width='100' />"),
                Starters = started) %>%
         filter(.data[[input$rvFilter]] == 1) %>%
-        left_join(rot_times_yvar(), by = "Player.y") %>%
-        select(player=Player.y, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
+        left_join(rot_times_yvar(), by = "Player") %>%
+        select(player=Player, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
     else if(input$rotOpp_temp == "All Season"){
       rotation_times %>%
         mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
         mutate(g_date = substr(g_date, 6, 11)) %>%
         mutate(label = paste0(opp, " (", g_date, ")")) %>%
-        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
-                   by = c("on_court"="player_join", "team"="Team")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(athlete_display_name)), 
+                   by = c("on_court"="player_join", "team"="team_location")) %>%
         left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
         filter(team == input$opponent,
                .data[[input$rvFilter]] == 1) %>%
         mutate(axis_lab1 = paste0("<img src='", URL, "' width='100' />")) %>%
-        left_join(rot_times_yvar(), by = "Player.y") %>%
-        select(player=Player.y, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
+        left_join(rot_times_yvar(), by = "Player") %>%
+        select(player=Player, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
     else{
       rotation_times %>%
         mutate(g_date = as.Date(g_date, tryFormats = "%m-%d-%Y")) %>%
         mutate(g_date = substr(g_date, 6, 11)) %>%
         mutate(label = paste0(opp, " (", g_date, ")")) %>%
-        right_join(headshot_url %>% mutate(player_join = standardize_name(Player)), 
-                   by = c("on_court"="player_join", "team"="Team")) %>%
+        right_join(headshot_url %>% mutate(player_join = standardize_name(athlete_display_name)), 
+                   by = c("on_court"="player_join", "team"="team_location")) %>%
         left_join(player_join_rv(), by = c("on_court"="player_join")) %>%
         filter(team == input$opponent,
                label %in% rotOpp_vec()[1:5],
                .data[[input$rvFilter]] == 1) %>%
         mutate(axis_lab1 = paste0("<img src='", URL, "' width='100' />")) %>%
-        left_join(rot_times_yvar(), by = "Player.y") %>%
-        select(player=Player.y, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
+        left_join(rot_times_yvar(), by = "Player") %>%
+        select(player=Player, team, url=URL, g_date, opp, stint_start_s, stint_end_s, axis_lab1, yvar, label)}
     )
   
   output$rvPlot = renderPlot(
