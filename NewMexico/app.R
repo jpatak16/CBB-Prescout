@@ -174,7 +174,7 @@ ui = navbarPage("Pre-Scout Portal", fluid = TRUE,
                            ) #end of PC tabset Panel
                          ), #end of PC tabPanel
                 
-                tabPanel("Opponent Overview", 
+                tabPanel("Opponent Trends", 
                          fluidRow(column(9, h1(strong("Pre-Scout Portal")), uiOutput("header5")),
                                   column(3, img(src="logo_NM.png", height = 180, width = 134))
                                   ), #end of header fluidRow
