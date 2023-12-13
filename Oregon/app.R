@@ -7,7 +7,10 @@ library(fmsb)
 library(cfbplotR)
 library(hoopR)
 library(rvest)
+library(piggyback)
 #remotes::install_github("sportsdataverse/hoopR")
+
+pb_download(repo = "jpatak16/CBB-Prescout", dest = "data", overwrite = T)
 
 our_team = "Oregon"
 viewableOpps = read.csv("data/viewable_opps.csv") %>% rename(team = our_team)
@@ -31,10 +34,10 @@ standardize_name = function(player_name){
 standardize_name = Vectorize(standardize_name)
 
 GMC_AP = read.csv("data/GMC_AP.csv")
-GMC_OS = read.csv("data/GMC_OS.csv")
+GMC_OS = read.csv("data/Oregon_GMC_OS.csv")
 GMC_NET = read.csv("data/GMC_NET.csv")
 GMC_medians = read.csv("data/GMC_medians.csv")
-graphic_info_OS = read.csv("data/graphic_info_OS.csv")
+graphic_info_OS = read.csv("data/Oregon_graphic_info_OS.csv")
 PPT_data = read.csv("data/PPT_data.csv", check.names = FALSE)
 OO_splits_data = read.csv("data/OO_splits_data.csv")
 Opp_Trends_df = read.csv("data/Opp_Trends_df.csv")
