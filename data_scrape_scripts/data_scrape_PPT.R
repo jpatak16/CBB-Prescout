@@ -1,6 +1,3 @@
-library(pacman)
-p_load(magrittr, dplyr, rvest, hoopR, tidyr)
-
 this_year=2024
 
 our_teams = c("Oregon", "Clemson", "Mississippi State", "New Mexico")
@@ -18,6 +15,7 @@ PPT_data = data.frame()
 for(opp in viewable_opps$opp){
   #SR data
   opponentSRurl = opponentSRurl_db %>% filter(opponent == opp) %>% pull(SRurl)
+  if(opponentSRurl == ""){next}
   SRopponentTables = read_html(opponentSRurl) %>% html_table()
   
   SR2_tab_num = ifelse(length(SRopponentTables) == 8, 4, 6)
@@ -120,10 +118,7 @@ for(opp in viewable_opps$opp){
 }
 
 write.csv(PPT_data, file = "data/PPT_data.csv", row.names = FALSE)
-write.csv(PPT_data, file = "Oregon/data/PPT_data.csv", row.names = FALSE)
-write.csv(PPT_data, file = "Clemson/data/PPT_data.csv", row.names = FALSE)
-write.csv(PPT_data, file = "MississippiState/data/PPT_data.csv", row.names = FALSE)
-write.csv(PPT_data, file = "NewMexico/data/PPT_data.csv", row.names = FALSE)
+pb_upload("data/PPT_data.csv")
 
 rm(headshot_urls_db, headshots_PPT, kp_pos, KP_PPT, KP2_PPT, lastGstarters, opponentSRurl_db, pos_c, pos_pf, pos_pg,
    pos_sf, pos_sg, PPT_data_temp, SR_PPT, SR2_PPT, SR3_PPT, SRopponentTables, viewable_opps, lastGdate, opp, opponent_espn,

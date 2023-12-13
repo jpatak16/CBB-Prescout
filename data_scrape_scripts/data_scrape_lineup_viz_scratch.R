@@ -50,9 +50,8 @@ for(t in viewable_opps$opp){
   }
 }
 
-write.csv(rotation_times, file = "Oregon/data/rotation_times.csv", row.names = F)
-write.csv(rotation_times, file = "Clemson/data/rotation_times.csv", row.names = F)
-write.csv(rotation_times, file = "MississippiState/data/rotation_times.csv", row.names = F)
-write.csv(rotation_times, file = "NewMexico/data/rotation_times.csv", row.names = F)
+write.csv(rotation_times, file = "data/rotation_times.csv", row.names = F)
+pb_upload("data/rotation_times.csv")
+
 
 rm(opp_games, opponentSRurl_db, pbp, t_games, viewable_opps, g, g_id, h_a, h_a_opp, h_v, next_row_start, r, t)

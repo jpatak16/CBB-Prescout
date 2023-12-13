@@ -10,10 +10,7 @@ headshots = hoopR::load_mbb_player_box(seasons = this_year) %>%
   mutate(athlete_headshot_href = ifelse(is.na(athlete_headshot_href), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", athlete_headshot_href))
 
 write.csv(headshots, file = "data/headshot_url.csv", row.names = FALSE)
-write.csv(headshots, file = "Oregon/data/headshot_url.csv", row.names = FALSE)
-write.csv(headshots, file = "Clemson/data/headshot_url.csv", row.names = FALSE)
-write.csv(headshots, file = "MississippiState/data/headshot_url.csv", row.names = FALSE)
-write.csv(headshots, file = "NewMexico/data/headshot_url.csv", row.names = FALSE)
+pb_upload(file = "data/headshot_url.csv")
 
 
 #viewable opps
@@ -32,9 +29,6 @@ for(t in kp_ot$KP_name){
 }
 
 write.csv(viewable_opps, file = "data/viewable_opps.csv", row.names = FALSE)
-write.csv(viewable_opps, file = "Oregon/data/viewable_opps.csv", row.names = FALSE)
-write.csv(viewable_opps, file = "Clemson/data/viewable_opps.csv", row.names = FALSE)
-write.csv(viewable_opps, file = "MississippiState/data/viewable_opps.csv", row.names = FALSE)
-write.csv(viewable_opps, file = "NewMexico/data/viewable_opps.csv", row.names = FALSE)
+pb_upload(file = "data/viewable_opps.csv")
 
 rm(kp_ot, n3g_this_opp, opponentSRurl_db, viewable_opps, n3g, n3g_fix, opponentList_ESPN, t)

@@ -29,6 +29,7 @@ Opp_Trends_df = data.frame()
 for(opp in viewable_opps$opp){
   #SR data
   opponentSRurl = opponentSRurl_db %>% filter(opponent == opp) %>% pull(SRurl)
+  if(opponentSRurl == ""){next}
   SRopponentTables = read_html(opponentSRurl) %>% html_table()
   
   #creates a variable for opponent name when referring to kp functions
@@ -224,15 +225,12 @@ for(opp in viewable_opps$opp){
   Sys.sleep(30)
 }
 
-write.csv(Opp_Trends_df, "Oregon/data/Opp_Trends_df.csv", row.names = FALSE)
-write.csv(Opp_Trends_df, "Clemson/data/Opp_Trends_df.csv", row.names = FALSE)
-write.csv(Opp_Trends_df, "MississippiState/data/Opp_Trends_df.csv", row.names = FALSE)
-write.csv(Opp_Trends_df, "NewMexico/data/Opp_Trends_df.csv", row.names = FALSE)
+write.csv(Opp_Trends_df, "data/Opp_Trends_df.csv", row.names = FALSE)
+pb_upload("data/Opp_Trends_df.csv")
 
-write.csv(OO_splits_data, "Oregon/data/OO_splits_data.csv", row.names = FALSE)
-write.csv(OO_splits_data, "Clemson/data/OO_splits_data.csv", row.names = FALSE)
-write.csv(OO_splits_data, "MississippiState/data/OO_splits_data.csv", row.names = FALSE)
-write.csv(OO_splits_data, "NewMexico/data/OO_splits_data.csv", row.names = FALSE)
+write.csv(OO_splits_data, "data/OO_splits_data.csv", row.names = FALSE)
+pb_upload("data/OO_splits_data.csv")
+
 
 rm(OO_trend_per_stat, opp_game_stats, opp_game_stats_away, opp_game_stats_conf, opp_game_stats_home, opp_game_stats_losses,
    opp_game_stats_net100, opp_game_stats_net50, opp_game_stats_recency10, opp_game_stats_recency5, opp_game_stats_wins, 

@@ -1,6 +1,3 @@
-library(pacman)
-p_load(magrittr, dplyr, rvest, janitor)
-
 this_year=2024
 
 our_teams = c("Oregon", "Clemson", "Mississippi State", "New Mexico")
@@ -177,21 +174,21 @@ styles_list = list(list(ncaa_guard_styles, nba_guard_styles),
                    list(ncaa_big_styles, nba_big_styles))
 
 
-#PCA
-ncaa_guard_pca = styles_list[[1]][[1]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
-nba_guard_pca = styles_list[[1]][[2]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
-ncaa_wing_pca = styles_list[[2]][[1]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
-nba_wing_pca = styles_list[[2]][[2]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
-ncaa_big_pca = styles_list[[3]][[1]] %>% select(stretch_big:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
-nba_big_pca = styles_list[[3]][[2]] %>% select(stretch_big:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
-
-#add pca vars back to styles list
-styles_list = list(list(cbind(ncaa_guard_styles, ncaa_guard_pca),
-                        cbind(nba_guard_styles, nba_guard_pca)),
-                   list(cbind(ncaa_wing_styles, ncaa_wing_pca),
-                        cbind(nba_wing_styles, nba_wing_pca)),
-                   list(cbind(ncaa_big_styles, ncaa_big_pca),
-                        cbind(nba_big_styles, nba_big_pca)))
+# #PCA
+# ncaa_guard_pca = styles_list[[1]][[1]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
+# nba_guard_pca = styles_list[[1]][[2]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
+# ncaa_wing_pca = styles_list[[2]][[1]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
+# nba_wing_pca = styles_list[[2]][[2]] %>% select(x3_p_s:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
+# ncaa_big_pca = styles_list[[3]][[1]] %>% select(stretch_big:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
+# nba_big_pca = styles_list[[3]][[2]] %>% select(stretch_big:dreb) %>% PCA() %>% .$ind %>% .$coord %>% as.data.frame() %>% .[,1:4]
+# 
+# #add pca vars back to styles list
+# styles_list = list(list(cbind(ncaa_guard_styles, ncaa_guard_pca),
+#                         cbind(nba_guard_styles, nba_guard_pca)),
+#                    list(cbind(ncaa_wing_styles, ncaa_wing_pca),
+#                         cbind(nba_wing_styles, nba_wing_pca)),
+#                    list(cbind(ncaa_big_styles, ncaa_big_pca),
+#                         cbind(nba_big_styles, nba_big_pca)))
 
 #only find similar players for players on viewable opp teams
 styles_list[[1]][[1]] = styles_list[[1]][[1]] %>% filter(team %in% viewable_opps$opp)
@@ -203,8 +200,8 @@ sim_list = list(); z=1
 for(a in styles_list){
   n_ncaa_players = nrow(a[[1]])
   for(player in 1:n_ncaa_players){
-    similarity_vec = dist(rbind(a[[1]][player,] %>% select(Dim.1:Dim.4), 
-                                a[[2]] %>% select(Dim.1:Dim.4)))[1:nrow(a[[2]])]
+    similarity_vec = dist(rbind(a[[1]][player,] %>% select(-player:-team) %>% select(-sim_1:-sim_5), 
+                                a[[2]] %>% select(-player:-team) %>% select(-sim_1:-sim_5)))[1:nrow(a[[2]])]
     top_5 = head(order(similarity_vec), 5)
     top_5 = a[[2]][top_5, 'player']
     a[[1]][player, 'sim_1'] = top_5[1]
@@ -228,36 +225,24 @@ ncaa_wing_sim = sim_list[[2]][[1]] %>% left_join(PPT_data %>% select(player_join
 ncaa_big_sim = sim_list[[3]][[1]] %>% left_join(PPT_data %>% select(player_join, URL, '#'), by = "player_join") %>% select(-player_join)
 
 
-write.csv(ncaa_guard_sim, file = "Oregon/data/ncaa_guard_sim.csv", row.names = FALSE)
-write.csv(ncaa_guard_sim, file = "Clemson/data/ncaa_guard_sim.csv", row.names = FALSE)
-write.csv(ncaa_guard_sim, file = "MississippiState/data/ncaa_guard_sim.csv", row.names = FALSE)
-write.csv(ncaa_guard_sim, file = "NewMexico/data/ncaa_guard_sim.csv", row.names = FALSE)
+write.csv(ncaa_guard_sim, file = "data/ncaa_guard_sim.csv", row.names = FALSE)
+pb_upload("data/ncaa_guard_sim.csv")
 
-write.csv(ncaa_wing_sim, file = "Oregon/data/ncaa_wing_sim.csv", row.names = FALSE)
-write.csv(ncaa_wing_sim, file = "Clemson/data/ncaa_wing_sim.csv", row.names = FALSE)
-write.csv(ncaa_wing_sim, file = "MississippiState/data/ncaa_wing_sim.csv", row.names = FALSE)
-write.csv(ncaa_wing_sim, file = "NewMexico/data/ncaa_wing_sim.csv", row.names = FALSE)
+write.csv(ncaa_wing_sim, file = "data/ncaa_wing_sim.csv", row.names = FALSE)
+pb_upload("data/ncaa_wing_sim.csv")
 
-write.csv(ncaa_big_sim, file = "Oregon/data/ncaa_big_sim.csv", row.names = FALSE)
-write.csv(ncaa_big_sim, file = "Clemson/data/ncaa_big_sim.csv", row.names = FALSE)
-write.csv(ncaa_big_sim, file = "MississippiState/data/ncaa_big_sim.csv", row.names = FALSE)
-write.csv(ncaa_big_sim, file = "NewMexico/data/ncaa_big_sim.csv", row.names = FALSE)
+write.csv(ncaa_big_sim, file = "data/ncaa_big_sim.csv", row.names = FALSE)
+pb_upload("data/ncaa_big_sim.csv")
 
 
-write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "Oregon/data/nba_guard_style.csv", row.names = FALSE)
-write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "Clemson/data/nba_guard_style.csv", row.names = FALSE)
-write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "MississippiState/data/nba_guard_style.csv", row.names = FALSE)
-write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "NewMexico/data/nba_guard_style.csv", row.names = FALSE)
+write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_guard_style.csv", row.names = FALSE)
+pb_upload("data/nba_guard_style.csv")
 
-write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "Oregon/data/nba_wing_style.csv", row.names = FALSE)
-write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "Clemson/data/nba_wing_style.csv", row.names = FALSE)
-write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "MississippiState/data/nba_wing_style.csv", row.names = FALSE)
-write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "NewMexico/data/nba_wing_style.csv", row.names = FALSE)
+write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_wing_style.csv", row.names = FALSE)
+pb_upload("data/nba_wing_style.csv")
 
-write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "Oregon/data/nba_big_style.csv", row.names = FALSE)
-write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "Clemson/data/nba_big_style.csv", row.names = FALSE)
-write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "MississippiState/data/nba_big_style.csv", row.names = FALSE)
-write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "NewMexico/data/nba_big_style.csv", row.names = FALSE)
+write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_big_style.csv", row.names = FALSE)
+pb_upload("data/nba_big_style.csv")
 
 rm(a, all_player_stats, big_stats, guard_stats, headshot_urls_db, nba_big_pca, nba_big_styles, nba_guard_pca, nba_guard_styles,
    nba_player_stats, nba_wing_pca, nba_wing_styles, ncaa_big_pca, ncaa_big_sim, ncaa_big_styles, ncaa_guard_pca, ncaa_guard_sim,

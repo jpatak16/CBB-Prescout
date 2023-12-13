@@ -135,10 +135,8 @@ for(c in 2:ncol(SR_team_stats)){
 }
 colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
 
-write.csv(GMC_medians, file = "Oregon/data/GMC_medians.csv", row.names = FALSE)
-write.csv(GMC_medians, file = "Clemson/data/GMC_medians.csv", row.names = FALSE)
-write.csv(GMC_medians, file = "MississippiState/data/GMC_medians.csv", row.names = FALSE)
-write.csv(GMC_medians, file = "NewMexico/data/GMC_medians.csv", row.names = FALSE)
+write.csv(GMC_medians, file = "data/GMC_medians.csv", row.names = FALSE)
+pb_upload("data/GMC_medians.csv")
 
 #get graphic info for each group of teams
 graphic_info_AP = cfbplotR::logo_ref %>%
@@ -155,15 +153,11 @@ graphic_info_NET = cfbplotR::logo_ref %>%
 GMC_AP = left_join(graphic_info_AP, SR_team_stats, by= 'school')
 GMC_NET = left_join(graphic_info_NET, SR_team_stats, by= 'school')
   
-write.csv(GMC_AP, file = "Oregon/data/GMC_AP.csv", row.names = FALSE)
-write.csv(GMC_AP, file = "Clemson/data/GMC_AP.csv", row.names = FALSE)
-write.csv(GMC_AP, file = "MississippiState/data/GMC_AP.csv", row.names = FALSE)
-write.csv(GMC_AP, file = "NewMexico/data/GMC_AP.csv", row.names = FALSE)
+write.csv(GMC_AP, file = "data/GMC_AP.csv", row.names = FALSE)
+pb_upload("data/GMC_AP.csv")
   
-write.csv(GMC_NET, file = "Oregon/data/GMC_NET.csv", row.names = FALSE)
-write.csv(GMC_NET, file = "Clemson/data/GMC_NET.csv", row.names = FALSE)
-write.csv(GMC_NET, file = "MississippiState/data/GMC_NET.csv", row.names = FALSE)
-write.csv(GMC_NET, file = "NewMexico/data/GMC_NET.csv", row.names = FALSE)
+write.csv(GMC_NET, file = "data/GMC_NET.csv", row.names = FALSE)
+pb_upload("data/GMC_NET.csv")
 
 #loop for each of our teams schedule
 for(t in our_teams){
@@ -179,8 +173,11 @@ for(t in our_teams){
   
   GMC_OS = left_join(graphic_info_OS, SR_team_stats, by= 'school')
   
-  write.csv(GMC_OS, file = paste0(gsub(" ", "", t), "/data/GMC_OS.csv"), row.names = FALSE)
-  write.csv(graphic_info_OS, file = paste0(gsub(" ", "", t), "/data/graphic_info_OS.csv"), row.names = FALSE)
+  write.csv(GMC_OS, file = paste0("data/", gsub(" ", "", t), "_GMC_OS.csv"), row.names = FALSE)
+  pb_upload(file = paste0("data/", gsub(" ", "", t), "_GMC_OS.csv"))
+  
+  write.csv(graphic_info_OS, file = paste0("data/", gsub(" ", "", t), "_graphic_info_OS.csv"), row.names = FALSE)
+  pb_upload(file = paste0("data/", gsub(" ", "", t), "_graphic_info_OS.csv"))
 }
 
 

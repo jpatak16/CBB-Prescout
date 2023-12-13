@@ -29,9 +29,6 @@ games = games %>% mutate(away = gsub(" St.", " State", game.away.names.short),
   select(gameID = game.gameID, home, away, url = game.url, start_date = game.startDate)
 
 write.csv(games, file = "data/ncaa_games.csv", row.names = F)
-write.csv(games, file = "Oregon/data/ncaa_games.csv", row.names = F)
-write.csv(games, file = "Clemson/data/ncaa_games.csv", row.names = F)
-write.csv(games, file = "MississippiState/data/ncaa_games.csv", row.names = F)
-write.csv(games, file = "NewMexico/data/ncaa_games.csv", row.names = F)
+pb_upload("data/ncaa_games.csv")
 
 rm(json, opponentSRurl_db, viewable_opps, d, exist, season_dates)
