@@ -107,6 +107,10 @@ color6 = "#9300ff"
 
 
 ui = navbarPage("Pre-Scout Portal", fluid = TRUE, 
+                tags$style(type="text/css",
+                           ".shiny-output-error { visibility: hidden; }",
+                           ".shiny-output-error:before { visibility: hidden; }",
+                           ".modal-dialog { width: fit-content !important; }"),
                 tags$head(tags$style('ul.nav-pills{display: flex !important;justify-content: center !important; padding-bottom: 50px;}')),
                 tabPanel("Matchup Selection", 
                          fluidRow(column(3, selectInput("opponent", "Opponent", opponentList)),
