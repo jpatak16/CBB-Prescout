@@ -1,6 +1,3 @@
-this_year=2024
-
-our_teams = c("Oregon", "Clemson", "Mississippi State", "New Mexico")
 viewable_opps = read.csv("data/viewable_opps.csv")
 opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),

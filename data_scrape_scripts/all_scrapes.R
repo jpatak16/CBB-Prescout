@@ -1,6 +1,6 @@
 library(pacman)
 p_load(magrittr, dplyr, jsonlite, purrr, tidyr, stringr, lubridate, cli,
-       janitor, rvest, cfbplotR, hoopR, cbbdata, httr, rlang, FactoMineR, piggyback)
+       janitor, rvest, cfbplotR, hoopR, httr, rlang, FactoMineR, piggyback)
 
 this_year=2024
 our_teams = c("Oregon", "Clemson", "Mississippi State", "New Mexico")
