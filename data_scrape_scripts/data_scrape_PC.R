@@ -232,14 +232,14 @@ write.csv(ncaa_big_sim, file = "data/ncaa_big_sim.csv", row.names = FALSE)
 pb_upload("data/ncaa_big_sim.csv")
 
 
-write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_guard_style.csv", row.names = FALSE)
-pb_upload("data/nba_guard_style.csv")
-
-write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_wing_style.csv", row.names = FALSE)
-pb_upload("data/nba_wing_style.csv")
-
-write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_big_style.csv", row.names = FALSE)
-pb_upload("data/nba_big_style.csv")
+# write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_guard_style.csv", row.names = FALSE)
+# pb_upload("data/nba_guard_style.csv")
+# 
+# write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_wing_style.csv", row.names = FALSE)
+# pb_upload("data/nba_wing_style.csv")
+# 
+# write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_big_style.csv", row.names = FALSE)
+# pb_upload("data/nba_big_style.csv")
 
 rm(a, all_player_stats, big_stats, guard_stats, headshot_urls_db, nba_big_pca, nba_big_styles, nba_guard_pca, nba_guard_styles,
    nba_player_stats, nba_wing_pca, nba_wing_styles, ncaa_big_pca, ncaa_big_sim, ncaa_big_styles, ncaa_guard_pca, ncaa_guard_sim,
