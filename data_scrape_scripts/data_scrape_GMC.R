@@ -1,5 +1,5 @@
-viewable_opps = read.csv("data/viewable_opps.csv")
-opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+viewable_opps = read.csv(here::here("data/viewable_opps.csv"))
+opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 
@@ -135,8 +135,8 @@ for(c in 2:ncol(SR_team_stats)){
 }
 colnames(GMC_medians) <- colnames(SR_team_stats)[2:69]
 
-write.csv(GMC_medians, file = "data/GMC_medians.csv", row.names = FALSE)
-pb_upload("data/GMC_medians.csv")
+write.csv(GMC_medians, file = here::here("data/GMC_medians.csv"), row.names = FALSE)
+pb_upload(here::here("data/GMC_medians.csv"))
 
 #get graphic info for each group of teams
 graphic_info_AP = cfbplotR::logo_ref %>%
@@ -153,11 +153,11 @@ graphic_info_NET = cfbplotR::logo_ref %>%
 GMC_AP = left_join(graphic_info_AP, SR_team_stats, by= 'school')
 GMC_NET = left_join(graphic_info_NET, SR_team_stats, by= 'school')
   
-write.csv(GMC_AP, file = "data/GMC_AP.csv", row.names = FALSE)
-pb_upload("data/GMC_AP.csv")
+write.csv(GMC_AP, file = here::here("data/GMC_AP.csv"), row.names = FALSE)
+pb_upload(here::here("data/GMC_AP.csv"))
   
-write.csv(GMC_NET, file = "data/GMC_NET.csv", row.names = FALSE)
-pb_upload("data/GMC_NET.csv")
+write.csv(GMC_NET, file = here::here("data/GMC_NET.csv"), row.names = FALSE)
+pb_upload(here::here("data/GMC_NET.csv"))
 
 #loop for each of our teams schedule
 for(t in our_teams){
@@ -173,11 +173,11 @@ for(t in our_teams){
   
   GMC_OS = left_join(graphic_info_OS, SR_team_stats, by= 'school')
   
-  write.csv(GMC_OS, file = paste0("data/", gsub(" ", "", t), "_GMC_OS.csv"), row.names = FALSE)
-  pb_upload(file = paste0("data/", gsub(" ", "", t), "_GMC_OS.csv"))
+  write.csv(GMC_OS, file = here::here(paste0("data/", gsub(" ", "", t), "_GMC_OS.csv")), row.names = FALSE)
+  pb_upload(file = here::here(paste0("data/", gsub(" ", "", t), "_GMC_OS.csv")))
   
-  write.csv(graphic_info_OS, file = paste0("data/", gsub(" ", "", t), "_graphic_info_OS.csv"), row.names = FALSE)
-  pb_upload(file = paste0("data/", gsub(" ", "", t), "_graphic_info_OS.csv"))
+  write.csv(graphic_info_OS, file = here::here(paste0("data/", gsub(" ", "", t), "_graphic_info_OS.csv")), row.names = FALSE)
+  pb_upload(file = here::here(paste0("data/", gsub(" ", "", t), "_graphic_info_OS.csv")))
 }
 
 

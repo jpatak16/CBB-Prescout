@@ -1,4 +1,4 @@
-opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 opponentList_ESPN = opponentSRurl_db$ESPN_name
@@ -9,8 +9,8 @@ headshots = hoopR::load_mbb_player_box(seasons = this_year) %>%
   filter(team_location %in% opponentList_ESPN) %>%
   mutate(athlete_headshot_href = ifelse(is.na(athlete_headshot_href), "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", athlete_headshot_href))
 
-write.csv(headshots, file = "data/headshot_url.csv", row.names = FALSE)
-pb_upload(file = "data/headshot_url.csv")
+write.csv(headshots, file = here::here("data/headshot_url.csv"), row.names = FALSE)
+pb_upload(file = here::here("data/headshot_url.csv"))
 
 
 #viewable opps
@@ -28,7 +28,7 @@ for(t in kp_ot$KP_name){
   Sys.sleep(15)
 }
 
-write.csv(viewable_opps, file = "data/viewable_opps.csv", row.names = FALSE)
-pb_upload(file = "data/viewable_opps.csv")
+write.csv(viewable_opps, file = here::here("data/viewable_opps.csv"), row.names = FALSE)
+pb_upload(file = here::here("data/viewable_opps.csv"))
 
 rm(kp_ot, n3g_this_opp, opponentSRurl_db, viewable_opps, n3g, n3g_fix, opponentList_ESPN, t)

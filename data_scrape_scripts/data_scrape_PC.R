@@ -1,12 +1,12 @@
-viewable_opps = read.csv("data/viewable_opps.csv")
-opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+viewable_opps = read.csv(here::here("data/viewable_opps.csv"))
+opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 
-headshot_urls_db = read.csv("data/headshot_url.csv") %>%
+headshot_urls_db = read.csv(here::here("data/headshot_url.csv")) %>%
   mutate(athlete_headshot_href = ifelse(athlete_headshot_href == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", athlete_headshot_href))
 
-PPT_data = read.csv("data/PPT_data.csv", check.names = FALSE)
+PPT_data = read.csv(here::here("data/PPT_data.csv"), check.names = FALSE)
 
 player_totals_url = 'https://www.sports-reference.com/cbb/play-index/psl_finder.cgi?request=1&match=single&year_min=2024&year_max=2024&conf_id=&school_id=&class_is_fr=Y&class_is_so=Y&class_is_jr=Y&class_is_sr=Y&pos_is_g=Y&pos_is_f=Y&pos_is_c=Y&games_type=A&qual=&c1stat=&c1comp=gt&c1val=&c2stat=&c2comp=gt&c2val=&c3stat=&c3comp=gt&c3val=&c4stat=&c4comp=gt&c4val=&order_by=pts&order_by_asc=&offset='
 offset = seq(0, 6000, by = 100)
@@ -46,7 +46,7 @@ ncaa_player_stats = player_totals %>% full_join(player_advanced) %>%
   rename(team = school)
 
 #load in a saved dataset of nba total and advanced stats
-nba_player_stats = read.csv("data/nba_stats.csv") %>%
+nba_player_stats = read.csv(here::here("data/nba_stats.csv")) %>%
   clean_names() %>% 
   mutate(class = 'NBA') %>%
   #match names to ncaa table
@@ -222,24 +222,24 @@ ncaa_wing_sim = sim_list[[2]][[1]] %>% left_join(PPT_data %>% select(player_join
 ncaa_big_sim = sim_list[[3]][[1]] %>% left_join(PPT_data %>% select(player_join, URL, '#'), by = "player_join") %>% select(-player_join)
 
 
-write.csv(ncaa_guard_sim, file = "data/ncaa_guard_sim.csv", row.names = FALSE)
-pb_upload("data/ncaa_guard_sim.csv")
+write.csv(ncaa_guard_sim, file = here::here("data/ncaa_guard_sim.csv"), row.names = FALSE)
+pb_upload(here::here("data/ncaa_guard_sim.csv"))
 
-write.csv(ncaa_wing_sim, file = "data/ncaa_wing_sim.csv", row.names = FALSE)
-pb_upload("data/ncaa_wing_sim.csv")
+write.csv(ncaa_wing_sim, file = here::here("data/ncaa_wing_sim.csv"), row.names = FALSE)
+pb_upload(here::here("data/ncaa_wing_sim.csv"))
 
-write.csv(ncaa_big_sim, file = "data/ncaa_big_sim.csv", row.names = FALSE)
-pb_upload("data/ncaa_big_sim.csv")
+write.csv(ncaa_big_sim, file = here::here("data/ncaa_big_sim.csv"), row.names = FALSE)
+pb_upload(here::here("data/ncaa_big_sim.csv"))
 
 
-# write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_guard_style.csv", row.names = FALSE)
-# pb_upload("data/nba_guard_style.csv")
+# write.csv(styles_list[[1]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = here::here("data/nba_guard_style.csv"), row.names = FALSE)
+# pb_upload(here::here("data/nba_guard_style.csv"))
 # 
-# write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_wing_style.csv", row.names = FALSE)
-# pb_upload("data/nba_wing_style.csv")
+# write.csv(styles_list[[2]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = here::here("data/nba_wing_style.csv"), row.names = FALSE)
+# pb_upload(here::here("data/nba_wing_style.csv"))
 # 
-# write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = "data/nba_big_style.csv", row.names = FALSE)
-# pb_upload("data/nba_big_style.csv")
+# write.csv(styles_list[[3]][[2]] %>% select(-c(player_join, sim_1, sim_1_url, sim_2, sim_3, sim_4, sim_5)), file = here::here("data/nba_big_style.csv"), row.names = FALSE)
+# pb_upload(here::here("data/nba_big_style.csv"))
 
 rm(a, all_player_stats, big_stats, guard_stats, headshot_urls_db, nba_big_pca, nba_big_styles, nba_guard_pca, nba_guard_styles,
    nba_player_stats, nba_wing_pca, nba_wing_styles, ncaa_big_pca, ncaa_big_sim, ncaa_big_styles, ncaa_guard_pca, ncaa_guard_sim,

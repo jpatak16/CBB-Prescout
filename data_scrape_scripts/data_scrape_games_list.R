@@ -1,5 +1,5 @@
-viewable_opps = read.csv("data/viewable_opps.csv")
-opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+viewable_opps = read.csv(here::here("data/viewable_opps.csv"))
+opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 
@@ -28,7 +28,7 @@ games = games %>% mutate(away = gsub(" St.", " State", game.away.names.short),
                           .default = home)) %>%
   select(gameID = game.gameID, home, away, url = game.url, start_date = game.startDate)
 
-write.csv(games, file = "data/ncaa_games.csv", row.names = F)
-pb_upload("data/ncaa_games.csv")
+write.csv(games, file = here::here("data/ncaa_games.csv"), row.names = F)
+pb_upload(here::here("data/ncaa_games.csv"))
 
 rm(json, opponentSRurl_db, viewable_opps, d, exist, season_dates)

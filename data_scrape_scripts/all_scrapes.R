@@ -1,6 +1,9 @@
 library(pacman)
 p_load(magrittr, dplyr, jsonlite, purrr, tidyr, stringr, lubridate, cli,
-       janitor, rvest, cfbplotR, hoopR, httr, rlang, FactoMineR, piggyback)
+       janitor, rvest, cfbplotR, hoopR, httr, rlang, piggyback, here)
+#p_load(FactoMineR)
+
+here::i_am("data_scrape_scripts/all_scrapes.R")
 
 this_year=2024
 our_teams = c("Oregon", "Clemson", "Mississippi State", "New Mexico")
@@ -829,31 +832,31 @@ parse_pbp <- function(pbp_text, type = "mens") {
   return(pbp_parsed)
 }
 
-# pb_upload("data/opp_url.csv")
-# pb_upload("data/nba_stats.csv")
+pb_upload(here::here("data/opp_url.csv"))
+pb_upload(here::here("data/nba_stats.csv"))
 
-source("data_scrape_scripts/data_scrape_headshots.R")
-
-Sys.sleep(300)
-
-source("data_scrape_scripts/data_scrape_GMC.R")
+source(here::here("data_scrape_scripts/data_scrape_headshots.R"))
 
 Sys.sleep(300)
 
-source("data_scrape_scripts/data_scrape_PPT.R")
+source(here::here("data_scrape_scripts/data_scrape_GMC.R"))
 
 Sys.sleep(300)
 
-source("data_scrape_scripts/data_scrape_OO.R")
+source(here::here("data_scrape_scripts/data_scrape_PPT.R"))
 
 Sys.sleep(300)
 
-source("data_scrape_scripts/data_scrape_PC.R")
+source(here::here("data_scrape_scripts/data_scrape_OO.R"))
 
 Sys.sleep(300)
 
-source("data_scrape_scripts/data_scrape_games_list.R")
+source(here::here("data_scrape_scripts/data_scrape_PC.R"))
 
 Sys.sleep(300)
 
-source("data_scrape_scripts/data_scrape_lineup_viz_scratch.R")
+source(here::here("data_scrape_scripts/data_scrape_games_list.R"))
+
+Sys.sleep(300)
+
+source(here::here("data_scrape_scripts/data_scrape_lineup_viz_scratch.R"))

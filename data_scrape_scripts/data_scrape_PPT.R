@@ -1,9 +1,9 @@
-viewable_opps = read.csv("data/viewable_opps.csv")
-opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+viewable_opps = read.csv(here::here("data/viewable_opps.csv"))
+opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 
-headshot_urls_db = read.csv("data/headshot_url.csv") %>%
+headshot_urls_db = read.csv(here::here("data/headshot_url.csv")) %>%
   mutate(athlete_headshot_href = ifelse(athlete_headshot_href == "", "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png", athlete_headshot_href))
 
 #empty df to populate
@@ -114,8 +114,8 @@ for(opp in viewable_opps$opp){
   Sys.sleep(30)
 }
 
-write.csv(PPT_data, file = "data/PPT_data.csv", row.names = FALSE)
-pb_upload("data/PPT_data.csv")
+write.csv(PPT_data, file = here::here("data/PPT_data.csv"), row.names = FALSE)
+pb_upload(here::here("data/PPT_data.csv"))
 
 rm(headshot_urls_db, headshots_PPT, kp_pos, KP_PPT, KP2_PPT, lastGstarters, opponentSRurl_db, pos_c, pos_pf, pos_pg,
    pos_sf, pos_sg, PPT_data_temp, SR_PPT, SR2_PPT, SR3_PPT, SRopponentTables, viewable_opps, lastGdate, opp, opponent_espn,

@@ -1,5 +1,5 @@
-viewable_opps = read.csv("data/viewable_opps.csv")
-opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+viewable_opps = read.csv(here::here("data/viewable_opps.csv"))
+opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 
@@ -225,11 +225,11 @@ for(opp in viewable_opps$opp){
   Sys.sleep(30)
 }
 
-write.csv(Opp_Trends_df, "data/Opp_Trends_df.csv", row.names = FALSE)
-pb_upload("data/Opp_Trends_df.csv")
+write.csv(Opp_Trends_df, here::here("data/Opp_Trends_df.csv"), row.names = FALSE)
+pb_upload(here::here("data/Opp_Trends_df.csv"))
 
-write.csv(OO_splits_data, "data/OO_splits_data.csv", row.names = FALSE)
-pb_upload("data/OO_splits_data.csv")
+write.csv(OO_splits_data, here::here("data/OO_splits_data.csv"), row.names = FALSE)
+pb_upload(here::here("data/OO_splits_data.csv"))
 
 
 rm(OO_trend_per_stat, opp_game_stats, opp_game_stats_away, opp_game_stats_conf, opp_game_stats_home, opp_game_stats_losses,

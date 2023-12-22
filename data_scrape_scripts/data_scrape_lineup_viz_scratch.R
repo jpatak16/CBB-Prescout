@@ -1,9 +1,9 @@
-viewable_opps = read.csv("data/viewable_opps.csv")
-opponentSRurl_db = read.csv("data/opp_url.csv", fileEncoding = "ISO-8859-1") %>% 
+viewable_opps = read.csv(here::here("data/viewable_opps.csv"))
+opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
 
-games = read.csv("data/ncaa_games.csv")
+games = read.csv(here::here("data/ncaa_games.csv"))
 
 opp_games = games %>% filter(away %in% viewable_opps$opp | home %in% viewable_opps$opp)
 
@@ -50,8 +50,8 @@ for(t in viewable_opps$opp){
   }
 }
 
-write.csv(rotation_times, file = "data/rotation_times.csv", row.names = F)
-pb_upload("data/rotation_times.csv")
+write.csv(rotation_times, file = here::here("data/rotation_times.csv"), row.names = F)
+pb_upload(here::here("data/rotation_times.csv"))
 
 
 rm(opp_games, opponentSRurl_db, pbp, t_games, viewable_opps, g, g_id, h_a, h_a_opp, h_v, next_row_start, r, t)
