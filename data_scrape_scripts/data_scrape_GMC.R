@@ -2,6 +2,7 @@ viewable_opps = read.csv(here::here("data/viewable_opps.csv"))
 opponentSRurl_db = read.csv(here::here("data/opp_url.csv"), fileEncoding = "ISO-8859-1") %>% 
   mutate(ESPN_name = ifelse(ESPN_name == "", opponent, ESPN_name),
          KP_name = ifelse(KP_name == "", gsub(" State", " St.", opponent), KP_name))
+logo_df = read.csv(here::here("data/logo_ref.csv"))
 
 #####basic offense table webscrape
 basic_offense_url = "https://www.sports-reference.com/cbb/seasons/2024-school-stats.html"
@@ -118,7 +119,8 @@ SR_team_stats = SR_team_stats %>%
          school= ifelse(school=="Texas A&M-Corpus Christi", "Texas A&M-CC", school),
          school= ifelse(school=="Texas-Rio Grande Valley", "UT Rio Grande Valley", school),
          school= ifelse(school=="Utah Tech", "Dixie State", school),
-         school= ifelse(school=="Virginia Commonwealth", "VCU", school))
+         school= ifelse(school=="Virginia Commonwealth", "VCU", school),
+         school= ifelse(school=="Queens (NC)", "Queens", school))
 
 #all_graphic_info = cfbplotR::logo_ref %>%
   #mutate(school = clean_school_names(school))
@@ -139,12 +141,12 @@ write.csv(GMC_medians, file = here::here("data/GMC_medians.csv"), row.names = FA
 pb_upload(here::here("data/GMC_medians.csv"))
 
 #get graphic info for each group of teams
-graphic_info_AP = cfbplotR::logo_ref %>%
+graphic_info_AP = logo_df %>%
   filter(school %in% AP_top25 | school %in% our_teams | school %in% viewable_opps$opp) %>%
   mutate(school = clean_school_names(school),
          school = ifelse(school=="UConn", "Connecticut", school),
          belong = ifelse(school %in% AP_top25, 1, 0))
-graphic_info_NET = cfbplotR::logo_ref %>%
+graphic_info_NET = logo_df %>%
   filter(school %in% NET_top50 | school %in% our_teams | school %in% viewable_opps$opp) %>%
   mutate(school = clean_school_names(school),
          belong = ifelse(school %in% NET_top50, 1, 0))
@@ -167,7 +169,7 @@ for(t in our_teams){
     mutate(opponent = clean_school_names(opponent)) %>% as.vector() %>% unlist() %>% unique()
   Sys.sleep(15)
   
-  graphic_info_OS = cfbplotR::logo_ref %>%
+  graphic_info_OS = logo_df %>%
     filter(school %in% our_schedule | school %in% vo_l | school == t) %>%
     mutate(school = clean_school_names(school))
   

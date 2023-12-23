@@ -37,7 +37,7 @@ for(opp in viewable_opps$opp){
     mutate(player_join = standardize_name(Player))
   KP_PPT = kp_team_players(opponent_kp, this_year) %>%
     select(number, ht, wt, yr, poss_pct, f_dper40, f_cper40)
-  headshots_PPT = headshot_urls_db %>% filter(team_location == opp)
+  headshots_PPT = headshot_urls_db %>% filter(team_location == opp | team_location == opponent_espn)
   
   #find player position
   kp_pos = kp_team_depth_chart(opponent_kp, this_year)
@@ -95,8 +95,11 @@ for(opp in viewable_opps$opp){
            "AST:TO" = round(ApG / TOV, 2)) %>%
     select(-starter) %>%
     separate(Player.x, into = c('first', 'last'), sep = "[^\\w'.-]", extra = 'merge') %>%
+    left_join(opponentSRurl_db, by = c('team_location' = 'ESPN_name')) %>%
+    select(-team_location, -KP_name, -SRurl) %>%
+    rename(Team = opponent) %>%
     #order columns into the order I want them to appear in the PPT
-    select("#", player_join, URL=athlete_headshot_href, first, last, Team=team_location, 
+    select("#", player_join, URL=athlete_headshot_href, first, last, Team, 
            Class=yr, Pos, Height=ht, Weight=wt, 
            GP=G, GS, MPG, "Poss%"=poss_pct, "USG%",
            PG, SG, SF, PF, C,

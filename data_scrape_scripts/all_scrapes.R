@@ -832,8 +832,9 @@ parse_pbp <- function(pbp_text, type = "mens") {
   return(pbp_parsed)
 }
 
-pb_upload(here::here("data/opp_url.csv"))
-pb_upload(here::here("data/nba_stats.csv"))
+#pb_upload(here::here("data/opp_url.csv"))
+#pb_upload(here::here("data/nba_stats.csv"))
+#pb_upload(here::here("data/logo_ref.csv"))
 
 source(here::here("data_scrape_scripts/data_scrape_headshots.R"))
 
